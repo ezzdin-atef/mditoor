@@ -59,8 +59,8 @@ Mditoor never locks your content into a proprietary format.
 # Supported Platforms
 
 - Windows
-- macOS
-- Linux
+- macOS (Soon)
+- Linux (Soon)
 
 ---
 
@@ -68,14 +68,12 @@ Mditoor never locks your content into a proprietary format.
 
 Current:
 
-- Next.js
-- MDX
+- Next.js (MDX)
 
 Planned:
 
 - Astro
-- Nextra
-- Contentlayer
+- NuxtJS
 - Docusaurus
 
 ---
@@ -122,18 +120,6 @@ my-blog/
 
 ---
 
-# Screens
-
-- Workspace Dashboard
-- Post Explorer
-- Rich Editor
-- Metadata Sidebar
-- Asset Manager
-- Settings
-- Preview Mode
-
----
-
 # Tech Stack
 
 ## Desktop
@@ -150,7 +136,6 @@ my-blog/
 ## UI
 
 - Tailwind CSS
-- shadcn/ui
 
 ## State
 
