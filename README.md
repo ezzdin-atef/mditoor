@@ -1,6 +1,6 @@
 # Mditoor
 
-> A desktop content studio for MDX, Next.js, and file-based websites.
+> A desktop content studio for MDX, Next.js, and file-based websites with supporting of both RTL and LTR Langs.
 
 Mditoor is a local-first desktop application built with Tauri, React, and Rust that makes editing MDX content easy while keeping your files inside your own repository.
 
@@ -153,46 +153,25 @@ my-blog/
 ## Install Dependencies
 
 ```bash
-pnpm install
+npm install
 ```
 
 ## Run Frontend
 
 ```bash
-pnpm dev
+npm dev
 ```
 
 ## Run Tauri
 
 ```bash
-pnpm tauri dev
+npm tauri dev
 ```
 
 ## Build Application
 
 ```bash
-pnpm tauri build
-```
-
----
-
-# Project Structure
-
-```text
-src/
-├── app/
-├── features/
-├── components/
-├── hooks/
-├── services/
-├── stores/
-└── types/
-
-src-tauri/
-├── commands/
-├── services/
-├── models/
-└── utils/
+npm tauri build
 ```
 
 ---
