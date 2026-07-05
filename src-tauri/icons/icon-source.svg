@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1E3566"/>
+      <stop offset="100%" stop-color="#091A3A"/>
+    </linearGradient>
+    <linearGradient id="mg" x1="168" y1="150" x2="856" y2="880" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#C8D8FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- Subtle top-left highlight -->
+  <ellipse cx="200" cy="180" rx="320" ry="260"
+           fill="none"
+           stroke="rgba(100,160,255,0.12)"
+           stroke-width="1"/>
+
+  <!-- M letter — stroked open path -->
+  <polyline
+    points="168,880 168,150 512,548 856,150 856,880"
+    fill="none"
+    stroke="url(#mg)"
+    stroke-width="108"
+    stroke-linejoin="miter"
+    stroke-linecap="butt"
+    stroke-miterlimit="20"
+  />
+
+  <!-- Tiny accent dot below centre — signals cursor / editor -->
+  <circle cx="512" cy="920" r="22" fill="rgba(100,160,255,0.55)"/>
+</svg>

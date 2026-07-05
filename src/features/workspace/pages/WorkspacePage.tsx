@@ -1,29 +1,77 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { COLORS, useStore } from '../store';
+import { useTranslation } from 'react-i18next';
+import { useStore } from '../store';
 import { CreateWorkspaceModal } from '../components/CreateWorkspaceModal';
 import { MetadataFieldEditor } from '../components/MetadataFieldEditor';
+import { WorkspaceSettingsTab } from '../components/WorkspaceSettingsTab';
+import { GitPanel } from '../../git/components/GitPanel';
+import { AssetGallery } from '../../assets/components/AssetGallery';
 import { useRouter } from '../../../router';
+import { useConfirmDialog } from '../../../components/ConfirmDialog';
 
-const POST_EMOJIS = ['📝', '✍️', '💡', '🎯', '🔖', '📌', '🧩', '⚡', '🌟', '🎨'];
+type Tab = 'posts' | 'metadata' | 'git' | 'images' | 'settings';
+const TABS: Tab[] = ['posts', 'metadata', 'git', 'images', 'settings'];
 
-function slugEmoji(slug: string): string {
-  let h = 5381;
-  for (let i = 0; i < slug.length; i++) h = ((h << 5) + h) ^ slug.charCodeAt(i);
-  return POST_EMOJIS[Math.abs(h) % POST_EMOJIS.length];
+/* ─── Icons ──────────────────────────────────────────────────────────── */
+
+function IconTrash() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+      <path d="M2 3.5h9M5 3.5V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5v1M3.5 3.5l.5 7a.5.5 0 00.5.5h4a.5.5 0 00.5-.5l.5-7" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
+
+function IconChevronRight() {
+  return (
+    <svg className="rtl-mirror" width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden="true">
+      <path d="M3 2l2.5 2.5L3 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconSettings() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+      <circle cx="6.5" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.1" />
+      <path d="M6.5 1.5v1M6.5 10.5v1M1.5 6.5h1M10.5 6.5h1M3.05 3.05l.7.7M9.25 9.25l.7.7M9.95 3.05l-.7.7M3.75 9.25l-.7.7" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconPlus() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+      <path d="M5.5 1.5v8M1.5 5.5h8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconRefresh() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <path d="M10.5 6A4.5 4.5 0 116 1.5a4.5 4.5 0 013.18 1.32L10.5 4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+      <path d="M8.5 4h2V2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/* ─── Main Page ──────────────────────────────────────────────────────── */
 
 export function WorkspacePage() {
   const { workspaces, activeId, setActive, deleteWorkspace } = useStore();
   const { navigate } = useRouter();
+  const { t } = useTranslation();
   const [showCreate, setShowCreate] = useState(false);
-  const [activeTab, setActiveTab] = useState<'posts' | 'metadata'>('posts');
+  const [activeTab, setActiveTab] = useState<Tab>('posts');
   const [slugs, setSlugs] = useState<string[]>([]);
   const [loadingSlugs, setLoadingSlugs] = useState(false);
   const [slugsError, setSlugsError] = useState<string | null>(null);
+  const [newPostOpen, setNewPostOpen] = useState(false);
+  const { confirm, confirmationDialog } = useConfirmDialog();
 
   const active = workspaces.find(w => w.id === activeId) ?? null;
-  const color = active ? COLORS[active.colorIdx % COLORS.length] : COLORS[0];
 
   const fetchSlugs = (path: string) => {
     setLoadingSlugs(true);
@@ -39,90 +87,81 @@ export function WorkspacePage() {
     fetchSlugs(active.mdxPath);
   }, [active?.id, active?.mdxPath]);
 
+  // Keyboard shortcuts: Cmd+N → new post, Cmd+, → new workspace
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key === 'n' && active) {
+        e.preventDefault();
+        setActiveTab('posts');
+        setNewPostOpen(true);
+      }
+      if (mod && e.key === ',' && !active) {
+        e.preventDefault();
+        setShowCreate(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [active]);
+
+  const handleDelete = async () => {
+    if (!active) return;
+    const confirmed = await confirm({
+      title: t('workspace.delete'),
+      message: t('workspace.deleteConfirm', { name: active.name }),
+      confirmLabel: t('common.delete'),
+      cancelLabel: t('common.cancel'),
+    });
+    if (confirmed) deleteWorkspace(active.id);
+  };
+
   return (
     <div className="flex h-screen overflow-hidden">
       {/* ══ Sidebar ══ */}
       <aside
-        className="w-60 flex-shrink-0 flex flex-col overflow-hidden"
-        style={{ background: 'var(--sb-bg)', borderRight: '1px solid var(--sb-border)' }}
+        className="w-56 flex-shrink-0 flex flex-col overflow-hidden"
+        style={{ background: 'var(--sb-bg)', borderInlineEnd: '1px solid var(--sb-border)' }}
       >
-        {/* Logo area */}
-        <div className="px-4 py-4 flex-shrink-0" style={{ borderBottom: '1px solid var(--sb-border)' }}>
-          <div className="flex items-center gap-3">
-            <div
-              className="w-9 h-9 rounded-2xl flex items-center justify-center text-base select-none flex-shrink-0"
-              style={{
-                background: 'linear-gradient(135deg, #a78bfa 0%, #ec4899 100%)',
-                boxShadow: '0 4px 16px rgba(167,139,250,0.5)',
-              }}
-            >
-              ✨
-            </div>
-            <div>
-              <p className="font-black text-sm leading-none" style={{ color: 'var(--sb-text)' }}>mditoor</p>
-              <p className="text-[10px] mt-0.5 font-bold" style={{ color: 'var(--sb-muted)' }}>MDX editor</p>
-            </div>
+        {/* Masthead */}
+        <div
+          className="px-4 pt-4 pb-3 flex-shrink-0"
+          style={{ borderBottom: '1px solid var(--sb-border)' }}
+        >
+          <div
+            className="text-[15px] font-semibold"
+            style={{ color: 'var(--sb-text)' }}
+          >
+            {t('app.name')}
+          </div>
+          <div className="mt-0.5 text-[11px]" style={{ color: 'var(--sb-muted)' }}>
+            {t('app.tagline')}
           </div>
         </div>
 
-        {/* Workspace list */}
-        <div className="flex-1 overflow-y-auto px-3 py-3">
-          <p
-            className="text-[9px] font-black uppercase tracking-[0.2em] px-2 mb-2.5"
-            style={{ color: 'var(--sb-muted)' }}
-          >
-            Workspaces
-          </p>
-
-          {workspaces.length === 0 ? (
-            <div className="text-center py-8 px-3">
-              <div className="text-3xl mb-2 animate-float select-none">🌟</div>
-              <p className="text-[11px] font-bold leading-relaxed" style={{ color: 'var(--sb-muted)' }}>
-                No workspaces yet
-              </p>
+        {/* Workspace list — no eyebrow label */}
+        <div className="flex-1 overflow-y-auto px-2 py-2">
+              {workspaces.length === 0 ? (
+            <div className="px-2 py-3">
+              <p className="text-xs" style={{ color: 'var(--sb-muted)' }}>{t('workspace.empty')}</p>
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {workspaces.map(w => {
-                const c = COLORS[w.colorIdx % COLORS.length];
                 const isActive = w.id === activeId;
                 return (
                   <button
                     key={w.id}
                     onClick={() => { setActive(w.id); setActiveTab('posts'); }}
-                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-all duration-200"
-                    style={{
-                      background: isActive ? 'var(--sb-active)' : 'transparent',
-                      boxShadow: isActive ? `0 0 0 1.5px ${c.start}50` : 'none',
-                    }}
-                    onMouseEnter={e => {
-                      if (!isActive) (e.currentTarget as HTMLElement).style.background = 'var(--sb-hover)';
-                    }}
-                    onMouseLeave={e => {
-                      if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent';
-                    }}
+                    className={`mac-sidebar-item${isActive ? ' selected' : ''}`}
                   >
                     <div
-                      className="w-7 h-7 rounded-xl flex-shrink-0 flex items-center justify-center text-white text-xs font-black"
-                      style={{
-                        background: `linear-gradient(135deg, ${c.start}, ${c.end})`,
-                        boxShadow: `0 3px 10px ${c.start}55`,
-                      }}
+                      className="w-4 h-4 flex-shrink-0 flex items-center justify-center text-[13px]"
+                      aria-hidden="true"
                     >
-                      {w.name[0]?.toUpperCase() ?? '?'}
+                      {w.icon}
                     </div>
-                    <p
-                      className="text-xs font-bold truncate flex-1"
-                      style={{ color: isActive ? 'var(--sb-text)' : 'var(--sb-muted)' }}
-                    >
-                      {w.name}
-                    </p>
-                    {isActive && (
-                      <div
-                        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                        style={{ background: c.start }}
-                      />
-                    )}
+                    <span className="truncate flex-1 text-[13px]">{w.name}</span>
                   </button>
                 );
               })}
@@ -132,27 +171,23 @@ export function WorkspacePage() {
 
         {/* Bottom actions */}
         <div
-          className="px-3 py-3 flex-shrink-0 space-y-2"
+          className="px-2 py-2 flex-shrink-0 space-y-0.5"
           style={{ borderTop: '1px solid var(--sb-border)' }}
         >
           <button
             onClick={() => setShowCreate(true)}
-            className="joy-btn w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-white text-xs font-black"
-            style={{
-              background: 'linear-gradient(135deg, #a78bfa 0%, #ec4899 100%)',
-              boxShadow: '0 4px 18px rgba(167,139,250,0.42)',
-            }}
+            className="mac-sidebar-item w-full"
+            style={{ color: 'var(--accent)' }}
           >
-            <span>✨</span> New Workspace
+            <IconPlus />
+            <span className="text-[13px] font-medium">{t('workspace.new')}</span>
           </button>
           <button
             onClick={() => navigate({ page: 'settings' })}
-            className="joy-btn w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all duration-150"
-            style={{ color: 'var(--sb-muted)', background: 'transparent' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--sb-hover)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+            className="mac-sidebar-item w-full"
           >
-            ⚙️ Settings
+            <IconSettings />
+            <span className="text-[13px]" style={{ color: 'var(--sb-muted)' }}>{t('nav.settings')}</span>
           </button>
         </div>
       </aside>
@@ -165,86 +200,65 @@ export function WorkspacePage() {
           <>
             {/* Workspace header */}
             <div
-              className="px-8 pt-6 pb-0 flex-shrink-0"
-              style={{
-                background: `linear-gradient(135deg, ${color.start}18 0%, ${color.end}0a 100%), var(--surface)`,
-                borderBottom: '2px solid var(--border)',
-              }}
+              className="px-6 pt-4 flex-shrink-0"
+              style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}
             >
-              <div className="flex items-center justify-between mb-5">
-                <div className="flex items-center gap-4 animate-slide-left">
-                  <div
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-white text-xl font-black"
-                    style={{
-                      background: `linear-gradient(135deg, ${color.start}, ${color.end})`,
-                      boxShadow: `0 6px 24px ${color.start}55`,
-                    }}
-                  >
-                    {active.name[0]?.toUpperCase() ?? '?'}
-                  </div>
-                  <div>
-                    <h1 className="text-xl font-black leading-tight" style={{ color: 'var(--text)' }}>
-                      {active.name}
-                    </h1>
-                    <p
-                      className="text-xs mt-0.5 font-mono font-semibold truncate max-w-sm"
-                      style={{ color: 'var(--text-faint)' }}
-                    >
-                      {active.mdxPath}
-                    </p>
-                  </div>
+              {/* Headline row */}
+              <div className="flex items-start justify-between gap-4 pb-3">
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-[20px] font-semibold truncate" style={{ color: 'var(--text)' }}>
+                    <span className="me-2" aria-hidden="true">{active.icon}</span>
+                    {active.name}
+                  </h1>
+                  <p className="text-xs mt-0.5 truncate mac-input-mono" style={{ color: 'var(--text-faint)' }}>
+                    {active.mdxPath}
+                  </p>
                 </div>
-                <button
-                  onClick={() => {
-                    if (confirm(`Delete workspace "${active.name}"? This won't delete any files.`)) {
-                      deleteWorkspace(active.id);
-                    }
-                  }}
-                  className="joy-btn text-xs font-bold px-3 py-1.5 rounded-xl border-2 transition-all"
-                  style={{
-                    color: 'var(--text-faint)',
-                    borderColor: 'var(--border)',
-                    background: 'transparent',
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.color = '#ef4444';
-                    (e.currentTarget as HTMLElement).style.borderColor = '#fca5a5';
-                    (e.currentTarget as HTMLElement).style.background = '#fef2f2';
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
-                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
-                    (e.currentTarget as HTMLElement).style.background = 'transparent';
-                  }}
-                >
-                  🗑 Delete
-                </button>
+
+                <div className="flex items-center gap-1.5 flex-shrink-0 pt-0.5">
+                  {/* Delete */}
+                  <button
+                    onClick={handleDelete}
+                    className="toolbar-btn p-1.5 flex items-center justify-center"
+                    title={t('workspace.delete')}
+                    style={{ color: 'var(--text-faint)' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--red)'; (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  >
+                    <IconTrash />
+                  </button>
+                </div>
               </div>
 
-              {/* Tabs */}
-              <div className="flex gap-0.5">
-                {(['posts', 'metadata'] as const).map(tab => {
-                  const isTab = activeTab === tab;
-                  const count =
-                    tab === 'posts'
-                      ? (slugs.length > 0 ? ` (${slugs.length})` : '')
-                      : (active.metadataFields.length > 0 ? ` (${active.metadataFields.length})` : '');
+              {/* Tab strip */}
+              <div className="flex gap-0" role="tablist">
+                {TABS.map(tab => {
+                  const isActiveTab = activeTab === tab;
+                  const badge =
+                    tab === 'posts' && slugs.length > 0 ? slugs.length :
+                    tab === 'metadata' && active.metadataFields.length > 0 ? active.metadataFields.length :
+                    null;
                   return (
                     <button
                       key={tab}
+                      role="tab"
+                      aria-selected={isActiveTab}
                       onClick={() => setActiveTab(tab)}
-                      className="px-5 py-2.5 text-sm font-black rounded-t-2xl capitalize transition-all duration-200"
-                      style={
-                        isTab
-                          ? {
-                              background: 'var(--surface)',
-                              color: 'var(--accent)',
-                              boxShadow: 'inset 0 -3px 0 var(--accent)',
-                            }
-                          : { color: 'var(--text-faint)', background: 'transparent' }
-                      }
+                      className={`notion-tab${isActiveTab ? ' active' : ''} flex items-center gap-1.5`}
                     >
-                      {tab === 'posts' ? '📝' : '🏷'} {tab}{count}
+                      {t(`workspace.tabs.${tab}`)}
+                      {badge !== null && (
+                        <span
+                          className="text-[10px] px-1.5 font-medium rounded-full"
+                          style={{
+                            background: 'var(--surface-2)',
+                            color: 'var(--text-faint)',
+                            border: '1px solid var(--border)',
+                          }}
+                        >
+                          {badge}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -252,100 +266,115 @@ export function WorkspacePage() {
             </div>
 
             {/* Tab content */}
-            <div className="flex-1 overflow-y-auto" style={{ background: 'var(--surface)' }}>
-              <div className="p-8">
-                {activeTab === 'posts' ? (
-                  <PostsView
-                    slugs={slugs}
-                    loading={loadingSlugs}
-                    error={slugsError}
-                    workspaceId={active.id}
-                    onRefresh={() => fetchSlugs(active.mdxPath)}
-                  />
-                ) : (
-                  <MetadataFieldEditor workspaceId={active.id} fields={active.metadataFields} />
-                )}
-              </div>
+            <div className="flex-1 overflow-y-auto" style={{ background: 'var(--bg)' }}>
+              {activeTab === 'posts' ? (
+                <PostsView
+                  slugs={slugs}
+                  loading={loadingSlugs}
+                  error={slugsError}
+                  workspaceId={active.id}
+                  onRefresh={() => fetchSlugs(active.mdxPath)}
+                  openNew={newPostOpen}
+                  onNewOpened={() => setNewPostOpen(false)}
+                />
+              ) : activeTab === 'metadata' ? (
+                <div className="p-6">
+                  <MetadataFieldEditor workspaceId={active.id} mdxPath={active.mdxPath} fields={active.metadataFields} />
+                </div>
+              ) : activeTab === 'git' ? (
+                <div className="p-6">
+                  <GitPanel mdxPath={active.mdxPath} />
+                </div>
+              ) : activeTab === 'images' ? (
+                <div className="p-6">
+                  <AssetGallery mdxPath={active.mdxPath} storage={active.storage} />
+                </div>
+              ) : (
+                <div className="p-6">
+                  <WorkspaceSettingsTab workspace={active} />
+                </div>
+              )}
             </div>
           </>
         )}
       </main>
 
       {showCreate && <CreateWorkspaceModal onClose={() => setShowCreate(false)} />}
+      {confirmationDialog}
     </div>
   );
 }
+
+/* ─── Empty home (Feature 2 improves this) ───────────────────────────── */
 
 function EmptyHome({ onNew }: { onNew: () => void }) {
+  const { t } = useTranslation();
   return (
-    <div
-      className="relative flex-1 flex flex-col items-center justify-center text-center px-8 overflow-hidden animate-slide-up"
-    >
-      {/* Decorative blobs */}
-      <div
-        className="absolute top-20 right-16 w-52 h-52 rounded-full pointer-events-none"
-        style={{
-          background: 'radial-gradient(circle, var(--joy-blue), transparent 70%)',
-          filter: 'blur(45px)',
-          opacity: 0.28,
-        }}
-      />
-      <div
-        className="absolute bottom-24 left-16 w-60 h-60 rounded-full pointer-events-none"
-        style={{
-          background: 'radial-gradient(circle, var(--joy-pink), transparent 70%)',
-          filter: 'blur(55px)',
-          opacity: 0.2,
-        }}
-      />
-      <div
-        className="absolute top-1/3 left-1/4 w-36 h-36 rounded-full pointer-events-none"
-        style={{
-          background: 'radial-gradient(circle, var(--joy-yellow), transparent 70%)',
-          filter: 'blur(32px)',
-          opacity: 0.18,
-        }}
-      />
-
-      <div className="relative z-10">
-        <div className="text-8xl mb-6 animate-float select-none">🚀</div>
+    <div className="flex-1 flex flex-col items-center justify-center text-center px-8 mac-fade-in">
+      <div className="w-64 mb-7">
         <div
-          className="inline-block px-4 py-1.5 rounded-full text-xs font-black mb-5"
-          style={{ background: 'var(--accent-faint)', color: 'var(--accent)' }}
+          className="text-[28px] font-semibold py-2"
+          style={{ color: 'var(--text)' }}
         >
-          Welcome to mditoor!
+          {t('app.name')}
         </div>
-        <h2 className="text-3xl font-black mb-3 leading-tight" style={{ color: 'var(--text)' }}>
-          Your MDX playground
-          <br />
-          <span
-            style={{
-              background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
-          >
-            is ready for you
-          </span>{' '}
-          ✨
-        </h2>
-        <p className="text-sm font-bold leading-relaxed mb-8 max-w-xs mx-auto" style={{ color: 'var(--text-muted)' }}>
-          Create a workspace to start managing your MDX content. Select a posts folder and define your frontmatter schema.
-        </p>
-        <button
-          onClick={onNew}
-          className="joy-btn px-8 py-4 rounded-2xl text-white font-black text-base"
-          style={{
-            background: 'linear-gradient(135deg, #a78bfa 0%, #ec4899 100%)',
-            boxShadow: '0 8px 30px rgba(167,139,250,0.48)',
-          }}
-        >
-          ✨ Create my first Workspace
-        </button>
+        <div className="text-[12px] mb-2" style={{ color: 'var(--text-muted)' }}>
+          {t('app.tagline')}
+        </div>
       </div>
+      <p className="text-[13px] mb-6 max-w-[280px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        {t('workspace.emptyHint')}
+      </p>
+      <button onClick={onNew} className="mac-btn mac-btn-primary">
+        {t('workspace.create')}
+      </button>
     </div>
   );
 }
+
+/* ─── Skeleton loading rows ──────────────────────────────────────────── */
+
+function SkeletonRows({ count = 5 }: { count?: number }) {
+  return (
+    <div className="divide-y" style={{ borderColor: 'var(--border)' }} aria-label="Loading posts" aria-busy="true">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 px-6 py-3">
+          <div
+            className="flex-shrink-0"
+            style={{
+              width: 13,
+              height: 13,
+              background: 'var(--surface-3)',
+              animation: 'mac-fade-in 0.8s ease infinite alternate',
+            }}
+          />
+          <div
+            className=""
+            style={{
+              width: `${80 + (i * 37) % 120}px`,
+              height: 12,
+              background: 'var(--surface-3)',
+              animation: 'mac-fade-in 0.8s ease infinite alternate',
+              animationDelay: `${i * 0.05}s`,
+            }}
+          />
+          <div
+            className=""
+            style={{
+              width: 56,
+              height: 10,
+              background: 'var(--surface-2)',
+              animation: 'mac-fade-in 0.8s ease infinite alternate',
+              animationDelay: `${i * 0.05 + 0.04}s`,
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Posts view ─────────────────────────────────────────────────────── */
 
 function PostsView({
   slugs,
@@ -353,16 +382,28 @@ function PostsView({
   error,
   workspaceId,
   onRefresh,
+  openNew = false,
+  onNewOpened,
 }: {
   slugs: string[];
   loading: boolean;
   error: string | null;
   workspaceId: string;
   onRefresh: () => void;
+  openNew?: boolean;
+  onNewOpened?: () => void;
 }) {
   const { navigate } = useRouter();
+  const { t } = useTranslation();
   const [creatingSlug, setCreatingSlug] = useState('');
   const [showNewInput, setShowNewInput] = useState(false);
+
+  useEffect(() => {
+    if (openNew && !loading) {
+      setShowNewInput(true);
+      onNewOpened?.();
+    }
+  }, [openNew, loading]);
 
   const handleCreate = () => {
     const slug = creatingSlug.trim().replace(/\s+/g, '-').toLowerCase();
@@ -372,116 +413,76 @@ function PostsView({
     setShowNewInput(false);
   };
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="text-5xl mb-4 animate-spin-joy select-none">⭐</div>
-        <p className="text-sm font-black" style={{ color: 'var(--text-muted)' }}>
-          Scanning your posts...
-        </p>
-      </div>
-    );
-  }
+  /* Loading */
+  if (loading) return <SkeletonRows />;
 
+  /* Error */
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center animate-bounce-in">
-        <div className="text-6xl mb-4 select-none">😬</div>
-        <p className="text-base font-black mb-1" style={{ color: '#ef4444' }}>
-          Could not read folder
+      <div className="flex flex-col items-center justify-center py-20 text-center mac-fade-in px-6">
+        <p className="text-[13px] font-medium mb-1.5" style={{ color: 'var(--red)' }}>
+          {t('posts.errorFolder')}
         </p>
-        <p className="text-xs font-mono mb-6 max-w-sm break-all" style={{ color: 'var(--text-faint)' }}>
+        <p className="text-xs mac-input-mono mb-5 max-w-sm break-all" style={{ color: 'var(--text-faint)' }}>
           {error}
         </p>
-        <button
-          onClick={onRefresh}
-          className="joy-btn px-5 py-2.5 rounded-2xl font-black text-sm border-2"
-          style={{ borderColor: 'var(--border-2)', color: 'var(--text)', background: 'var(--surface-2)' }}
-        >
-          🔄 Try again
+        <button onClick={onRefresh} className="mac-btn">
+          {t('posts.tryAgain')}
         </button>
       </div>
     );
   }
 
+  /* Empty */
   if (slugs.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center animate-bounce-in">
-        <div className="text-6xl mb-5 animate-float select-none">📄</div>
-        <p className="text-xl font-black mb-2" style={{ color: 'var(--text)' }}>
-          No posts yet!
+      <div className="flex flex-col items-center justify-center py-20 text-center mac-fade-in px-6">
+        <p className="text-[13px] font-medium mb-1.5" style={{ color: 'var(--text)' }}>
+          {t('posts.empty')}
         </p>
-        <p className="text-sm font-bold mb-8 max-w-xs" style={{ color: 'var(--text-muted)' }}>
-          Create your first post or add an existing{' '}
-          <code
-            className="px-1.5 py-0.5 rounded-lg text-xs font-mono"
-            style={{
-              background: 'var(--surface-3)',
-              color: 'var(--accent)',
-              border: '1px solid var(--border)',
-            }}
-          >
-            [slug]/index.mdx
-          </code>{' '}
-          folder.
+        <p className="text-[13px] mb-6" style={{ color: 'var(--text-muted)' }}>
+          {t('posts.emptyHint')}
         </p>
-        <div className="flex items-center gap-3">
-          {showNewInput ? (
-            <NewPostInput
-              value={creatingSlug}
-              onChange={setCreatingSlug}
-              onCreate={handleCreate}
-              onCancel={() => { setShowNewInput(false); setCreatingSlug(''); }}
-            />
-          ) : (
-            <>
-              <button
-                onClick={() => setShowNewInput(true)}
-                className="joy-btn px-6 py-3 rounded-2xl text-white font-black text-sm"
-                style={{
-                  background: 'linear-gradient(135deg, #a78bfa, #ec4899)',
-                  boxShadow: '0 6px 22px rgba(167,139,250,0.4)',
-                }}
-              >
-                ✨ New Post
-              </button>
-              <button
-                onClick={onRefresh}
-                className="joy-btn text-sm font-bold px-4 py-2 rounded-xl border-2"
-                style={{
-                  color: 'var(--text-muted)',
-                  borderColor: 'var(--border)',
-                  background: 'var(--surface-2)',
-                }}
-              >
-                🔄 Refresh
-              </button>
-            </>
-          )}
-        </div>
+        {showNewInput ? (
+          <NewPostInput
+            value={creatingSlug}
+            onChange={setCreatingSlug}
+            onCreate={handleCreate}
+            onCancel={() => { setShowNewInput(false); setCreatingSlug(''); }}
+          />
+        ) : (
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowNewInput(true)} className="mac-btn mac-btn-primary">
+              {t('posts.new')}
+            </button>
+            <button onClick={onRefresh} className="mac-btn">
+              {t('posts.refresh')}
+            </button>
+          </div>
+        )}
       </div>
     );
   }
 
+  /* Post list */
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2.5">
-          <div
-            className="w-2.5 h-2.5 rounded-full"
-            style={{ background: 'var(--joy-green)' }}
-          />
-          <span className="text-sm font-black" style={{ color: 'var(--text)' }}>
-            {slugs.length} {slugs.length === 1 ? 'post' : 'posts'}
-          </span>
-        </div>
+      {/* List header */}
+      <div
+        className="flex items-center justify-between px-6 py-2.5 sticky top-0"
+        style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border-2)' }}
+      >
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {t('posts.count', { count: slugs.length })}
+        </span>
         <div className="flex items-center gap-2">
           <button
             onClick={onRefresh}
-            className="joy-btn text-xs font-bold px-3 py-1.5 rounded-xl border-2"
-            style={{ color: 'var(--text-muted)', borderColor: 'var(--border)', background: 'var(--surface-2)' }}
+            className="toolbar-btn p-1.5 flex items-center gap-1"
+            title={t('posts.refresh')}
+            aria-label={t('posts.refresh')}
           >
-            🔄 Refresh
+            <IconRefresh />
           </button>
           {showNewInput ? (
             <NewPostInput
@@ -493,21 +494,25 @@ function PostsView({
           ) : (
             <button
               onClick={() => setShowNewInput(true)}
-              className="joy-btn flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-xs font-black"
-              style={{
-                background: 'linear-gradient(135deg, #a78bfa, #ec4899)',
-                boxShadow: '0 4px 14px rgba(167,139,250,0.4)',
-              }}
+              className="mac-btn mac-btn-primary flex items-center gap-1.5"
+              style={{ fontSize: '12px', padding: '3px 10px' }}
             >
-              ✨ New Post
+              <IconPlus />
+              {t('posts.new')}
             </button>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 stagger">
+      {/* Rows */}
+      <div
+        className="divide-y"
+        style={{ borderColor: 'var(--border)' }}
+        role="list"
+        aria-label="Posts"
+      >
         {slugs.map(slug => (
-          <PostCard
+          <PostRow
             key={slug}
             slug={slug}
             onClick={() => navigate({ page: 'editor', workspaceId, slug, isNew: false })}
@@ -517,6 +522,45 @@ function PostsView({
     </div>
   );
 }
+
+/* ─── Post row ───────────────────────────────────────────────────────── */
+
+function PostRow({ slug, onClick }: { slug: string; onClick: () => void }) {
+  const { t } = useTranslation();
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      role="listitem"
+      className="w-full flex items-center gap-4 px-6 py-2.5 text-left transition-colors"
+      style={{
+        background: hovered ? 'var(--surface)' : 'transparent',
+        borderBottom: '1px solid var(--border)',
+      }}
+    >
+      <span className="text-[13px] font-medium flex-1 truncate" style={{ color: 'var(--text)' }}>
+        {slug}
+      </span>
+      <span
+        className="text-[11px] mac-input-mono flex-shrink-0"
+        style={{ color: 'var(--text-faint)' }}
+      >
+        {t('posts.indexFile')}
+      </span>
+      <span
+        className="flex-shrink-0 transition-opacity"
+        style={{ color: 'var(--text-faint)', opacity: hovered ? 1 : 0 }}
+      >
+        <IconChevronRight />
+      </span>
+    </button>
+  );
+}
+
+/* ─── New post input ─────────────────────────────────────────────────── */
 
 function NewPostInput({
   value,
@@ -529,10 +573,17 @@ function NewPostInput({
   onCreate: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
   return (
-    <div className="flex items-center gap-2 animate-bounce-in">
+    <div className="flex items-center gap-2 mac-fade-slide">
       <input
-        autoFocus
+        ref={inputRef}
         type="text"
         value={value}
         onChange={e => onChange(e.target.value)}
@@ -540,61 +591,26 @@ function NewPostInput({
           if (e.key === 'Enter') onCreate();
           if (e.key === 'Escape') onCancel();
         }}
-        placeholder="my-awesome-post"
-        className="px-3 py-2 rounded-xl font-mono text-xs font-bold w-44 border-2 transition-all duration-150"
-        style={{
-          background: 'var(--surface-2)',
-          borderColor: 'var(--border-2)',
-          color: 'var(--text)',
-          outline: 'none',
-        }}
-        onFocus={e => {
-          (e.target as HTMLInputElement).style.borderColor = 'var(--accent)';
-          (e.target as HTMLInputElement).style.boxShadow = '0 0 0 4px var(--accent-faint)';
-        }}
-        onBlur={e => {
-          (e.target as HTMLInputElement).style.borderColor = 'var(--border-2)';
-          (e.target as HTMLInputElement).style.boxShadow = 'none';
-        }}
+        placeholder={t('posts.slugPlaceholder')}
+        className="mac-input mac-input-mono"
+        style={{ width: '150px', fontSize: '12px', padding: '3px 8px' }}
+        aria-label={t('posts.new')}
       />
       <button
         onClick={onCreate}
         disabled={!value.trim()}
-        className="joy-btn px-3 py-2 rounded-xl text-xs font-black text-white disabled:opacity-40 disabled:cursor-not-allowed"
-        style={{ background: 'linear-gradient(135deg, #a78bfa, #7c3aed)' }}
+        className="mac-btn mac-btn-primary disabled:opacity-40"
+        style={{ fontSize: '12px', padding: '3px 10px' }}
       >
-        Create
+        {t('posts.create')}
       </button>
       <button
         onClick={onCancel}
-        className="joy-btn text-xs font-bold px-2 py-1.5 rounded-lg"
-        style={{ color: 'var(--text-faint)' }}
+        className="mac-btn"
+        style={{ fontSize: '12px', padding: '3px 10px' }}
       >
-        Cancel
+        {t('posts.cancel')}
       </button>
-    </div>
-  );
-}
-
-function PostCard({ slug, onClick }: { slug: string; onClick: () => void }) {
-  const emoji = slugEmoji(slug);
-  return (
-    <div
-      onClick={onClick}
-      className="joy-card group relative rounded-2xl p-4 select-none border-2"
-      style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
-    >
-      <div className="text-3xl mb-3 transition-all duration-300 group-hover:scale-125 group-hover:rotate-6 select-none">
-        {emoji}
-      </div>
-      <p className="text-sm font-black truncate" style={{ color: 'var(--text)' }}>{slug}</p>
-      <p className="text-[10px] font-mono mt-0.5 font-bold" style={{ color: 'var(--text-faint)' }}>
-        index.mdx
-      </p>
-      <div
-        className="absolute top-3 right-3 w-2 h-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-        style={{ background: 'var(--joy-green)' }}
-      />
     </div>
   );
 }

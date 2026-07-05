@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { RefObject } from 'react';
 
 interface Props {
@@ -6,6 +7,7 @@ interface Props {
   setBody: (v: string) => void;
   dir: 'ltr' | 'rtl' | 'auto';
   onDirChange: (d: 'ltr' | 'rtl' | 'auto') => void;
+  onInsertImage?: () => Promise<void>;
 }
 
 interface ToolbarBtn {
@@ -72,9 +74,9 @@ function bidiWrap(ltr: boolean): ToolbarBtn['action'] {
       setBody(body.slice(0, s) + mark + body.slice(s));
       requestAnimationFrame(() => { ta.setSelectionRange(s + 1, s + 1); ta.focus(); });
     } else {
-      const open  = ltr ? '⁦' : '⁧';
-      const sel   = body.slice(s, e);
-      const next  = body.slice(0, s) + open + sel + '⁩' + body.slice(e);
+      const open = ltr ? '⁦' : '⁧';
+      const sel  = body.slice(s, e);
+      const next = body.slice(0, s) + open + sel + '⁩' + body.slice(e);
       setBody(next);
       requestAnimationFrame(() => { ta.setSelectionRange(s + 1, s + 1 + sel.length); ta.focus(); });
     }
@@ -97,52 +99,44 @@ const GROUPS: { label: string; buttons: ToolbarBtn[] }[] = [
     buttons: [
       { label: 'B',  title: 'Bold · Ctrl+B',   action: inline('**') },
       { label: 'I',  title: 'Italic · Ctrl+I', action: inline('*') },
-      { label: 'S̶',  title: 'Strikethrough',   action: inline('~~') },
+      { label: 'S',  title: 'Strikethrough',   action: inline('~~') },
       { label: '`',  title: 'Inline code',      action: inline('`') },
     ],
   },
   {
     label: 'Block',
     buttons: [
-      { label: '❝',   title: 'Blockquote', action: linePrefix('> ') },
+      { label: '"',   title: 'Blockquote', action: linePrefix('> ') },
       { label: '</>', title: 'Code block', action: insert('\n```\n\n```\n', 5) },
     ],
   },
   {
     label: 'List',
     buttons: [
-      { label: '•—', title: 'Bullet list',  action: linePrefix('- ') },
+      { label: '•', title: 'Bullet list',  action: linePrefix('- ') },
       { label: '1.', title: 'Ordered list', action: linePrefix('1. ') },
     ],
   },
   {
     label: 'Insert',
     buttons: [
-      { label: '🔗', title: 'Link',    action: inline('[', '](url)', 'link text') },
-      { label: '🖼', title: 'Image',   action: insert('![alt](url)') },
-      { label: '—',  title: 'Divider', action: insert('\n\n---\n\n') },
+      { label: 'Link',  title: 'Link',    action: inline('[', '](url)', 'link text') },
+      { label: 'Image', title: 'Image',   action: insert('![alt](url)') },
+      { label: '—',     title: 'Divider', action: insert('\n\n---\n\n') },
     ],
   },
   {
     label: 'MDX',
     buttons: [
-      { label: 'Callout', title: 'MDX Callout',  action: insert('\n<Callout>\n\n</Callout>\n', 12) },
-      { label: 'import',  title: 'MDX import',   action: insert("import Component from './Component'\n") },
+      { label: 'Callout', title: 'MDX Callout', action: insert('\n<Callout>\n\n</Callout>\n', 12) },
+      { label: 'import',  title: 'MDX import',  action: insert("import Component from './Component'\n") },
     ],
   },
   {
     label: 'Bidi',
     buttons: [
-      {
-        label: '→LTR',
-        title: 'Force LTR — wrap selection to make text flow left-to-right.',
-        action: bidiWrap(true),
-      },
-      {
-        label: 'RTL←',
-        title: 'Force RTL — wrap selection to make text flow right-to-left.',
-        action: bidiWrap(false),
-      },
+      { label: '→LTR', title: 'Force LTR', action: bidiWrap(true) },
+      { label: 'RTL←', title: 'Force RTL', action: bidiWrap(false) },
     ],
   },
 ];
@@ -155,9 +149,10 @@ const DIR_OPTIONS: { value: 'ltr' | 'rtl' | 'auto'; label: string; title: string
 
 /* ── component ───────────────────────────────────────────── */
 
-export function Toolbar({ textareaRef, body, setBody, dir, onDirChange }: Props) {
+export function Toolbar({ textareaRef, body, setBody, dir, onDirChange, onInsertImage }: Props) {
   const wordCount = body.trim() ? body.trim().split(/\s+/).length : 0;
   const charCount = body.length;
+  const [uploading, setUploading] = useState(false);
 
   const run = (btn: ToolbarBtn) => {
     const ta = textareaRef.current;
@@ -165,19 +160,27 @@ export function Toolbar({ textareaRef, body, setBody, dir, onDirChange }: Props)
     btn.action(ta, body, setBody);
   };
 
+  const handleInsertImage = async () => {
+    if (!onInsertImage || uploading) return;
+    setUploading(true);
+    try { await onInsertImage(); } finally { setUploading(false); }
+  };
+
   return (
     <div
-      className="flex-shrink-0 border-b-2 select-none"
+      className="flex-shrink-0 border-b select-none"
       style={{ borderColor: 'var(--border)', background: 'var(--surface-2)' }}
     >
       {/* Button row */}
-      <div className="flex flex-wrap items-center gap-1.5 px-4 py-2">
-        {GROUPS.map(group => (
-          <div
-            key={group.label}
-            className="flex items-center gap-0.5 px-1.5 py-1 rounded-2xl"
-            style={{ background: 'var(--surface-3)' }}
-          >
+      <div className="flex flex-wrap items-center gap-1 px-3 py-1.5">
+        {GROUPS.map((group, gi) => (
+          <div key={group.label} className="flex items-center">
+            {gi > 0 && (
+              <div
+                className="w-px h-3.5 mx-1 flex-shrink-0"
+                style={{ background: 'var(--border-2)' }}
+              />
+            )}
             {group.buttons.map(btn => (
               <button
                 key={btn.title}
@@ -186,8 +189,8 @@ export function Toolbar({ textareaRef, body, setBody, dir, onDirChange }: Props)
                   run(btn);
                 }}
                 title={btn.title}
-                className="toolbar-btn px-2 py-0.5 text-xs font-black"
-                style={{ minWidth: '1.75rem', textAlign: 'center' }}
+                className="toolbar-btn px-2 py-1 text-[11px]"
+                style={{ minWidth: '1.6rem', textAlign: 'center' }}
               >
                 {btn.label}
               </button>
@@ -195,29 +198,32 @@ export function Toolbar({ textareaRef, body, setBody, dir, onDirChange }: Props)
           </div>
         ))}
 
-        {/* Spacer */}
+        {/* Upload image button — shown when workspace has storage configured */}
+        {onInsertImage && (
+          <>
+            <div className="w-px h-3.5 mx-1 flex-shrink-0" style={{ background: 'var(--border-2)' }} />
+            <button
+              onMouseDown={e => { e.preventDefault(); void handleInsertImage(); }}
+              disabled={uploading}
+              title="Upload image from disk"
+              className="toolbar-btn px-2 py-1 text-[11px] disabled:opacity-50"
+              style={{ minWidth: '1.6rem', textAlign: 'center', color: 'var(--accent)' }}
+            >
+              {uploading ? '...' : '+Img'}
+            </button>
+          </>
+        )}
+
         <div className="flex-1" />
 
-        {/* Direction toggle */}
-        <div
-          className="flex items-center gap-0.5 p-1 rounded-2xl"
-          style={{ background: 'var(--surface-3)' }}
-        >
+        {/* Direction segment control */}
+        <div className="mac-segmented">
           {DIR_OPTIONS.map(opt => (
             <button
               key={opt.value}
               onMouseDown={e => { e.preventDefault(); onDirChange(opt.value); }}
               title={opt.title}
-              className="joy-btn px-2.5 py-1 rounded-xl text-[11px] font-black transition-all duration-150"
-              style={
-                dir === opt.value
-                  ? {
-                      background: 'var(--accent)',
-                      color: '#fff',
-                      boxShadow: '0 2px 8px rgba(124,58,237,0.4)',
-                    }
-                  : { color: 'var(--text-faint)', background: 'transparent' }
-              }
+              className={`mac-segment${dir === opt.value ? ' active' : ''}`}
             >
               {opt.label}
             </button>
@@ -227,19 +233,16 @@ export function Toolbar({ textareaRef, body, setBody, dir, onDirChange }: Props)
 
       {/* Stats bar */}
       <div
-        className="flex items-center gap-3 px-4 py-1.5 border-t"
+        className="flex items-center gap-3 px-3 py-1 border-t"
         style={{ borderColor: 'var(--border)' }}
       >
-        <span
-          className="text-[10px] px-2 py-0.5 rounded-full font-black"
-          style={{ background: 'var(--accent-faint)', color: 'var(--accent)' }}
-        >
+        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
           {wordCount} {wordCount === 1 ? 'word' : 'words'}
         </span>
-        <span className="text-[10px] font-bold" style={{ color: 'var(--text-faint)' }}>
+        <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
           {charCount} chars
         </span>
-        <span className="text-[10px] font-bold" style={{ color: 'var(--text-faint)' }}>
+        <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
           {body.split('\n').length} lines
         </span>
       </div>

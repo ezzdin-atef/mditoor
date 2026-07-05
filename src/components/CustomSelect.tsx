@@ -9,7 +9,7 @@ export function CustomSelect({
   value,
   options = [],
   onChange,
-  placeholder = '— choose —',
+  placeholder = 'Choose...',
   showClear = true,
 }: {
   value: string;
@@ -42,51 +42,56 @@ export function CustomSelect({
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="joy-btn w-full flex items-center justify-between px-3 py-2 rounded-xl border-2 text-sm text-left transition-all duration-150"
+        className="w-full flex items-center justify-between px-2.5 py-1.5 text-sm transition-all"
         style={{
           background: 'var(--surface)',
-          borderColor: open ? 'var(--accent)' : 'var(--border)',
+          border: `1.5px solid ${open ? 'var(--accent)' : 'var(--border-2)'}`,
           color: value ? 'var(--text)' : 'var(--text-faint)',
-          boxShadow: open ? '0 0 0 4px var(--accent-faint)' : 'none',
+          boxShadow: open ? '2px 2px 0 var(--accent)' : 'none',
+          outline: 'none',
         }}
       >
-        <span className="truncate font-bold">{value ? selectedLabel : placeholder}</span>
-        <span
-          className="ml-2 text-[10px] flex-shrink-0 transition-transform duration-250"
+        <span className="truncate">{value ? selectedLabel : placeholder}</span>
+        <svg
+          width="10" height="6" viewBox="0 0 10 6" fill="none"
           style={{
+            marginInlineStart: 6,
+            flexShrink: 0,
             color: 'var(--text-faint)',
             transform: open ? 'rotate(180deg)' : 'none',
-            display: 'inline-block',
+            transition: 'transform 0.12s ease',
           }}
         >
-          &#9660;
-        </span>
+          <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
       </button>
 
       {open && (
         <div
-          className="absolute left-0 right-0 z-50 mt-1.5 rounded-2xl overflow-hidden dropdown-open"
+          className="absolute z-50 mt-px mac-dropdown"
           style={{
             top: '100%',
+            insetInlineStart: 0,
+            insetInlineEnd: 0,
             background: 'var(--surface)',
-            border: '2px solid var(--border)',
-            boxShadow: '0 16px 48px rgba(0,0,0,0.22), 0 0 0 1px var(--border)',
+            border: '1.5px solid var(--border-2)',
+            boxShadow: '4px 4px 0 var(--border-2)',
           }}
         >
           {showClear && (
             <button
               type="button"
               onClick={() => { onChange(''); setOpen(false); }}
-              className="w-full px-3 py-2 text-left text-xs border-b-2 font-bold transition-all duration-100"
+              className="w-full px-3 py-1.5 text-xs transition-colors duration-75"
               style={{
                 color: 'var(--text-faint)',
-                borderColor: 'var(--border)',
                 background: 'transparent',
+                borderBottom: '1px solid var(--border)',
               }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
-              &mdash; clear &mdash;
+              Clear
             </button>
           )}
 
@@ -97,7 +102,7 @@ export function CustomSelect({
                 key={opt.value}
                 type="button"
                 onClick={() => { onChange(opt.value); setOpen(false); }}
-                className="w-full px-3 py-2 text-left text-sm font-bold transition-all duration-100 flex items-center gap-2"
+                className="w-full px-3 py-1.5 text-sm transition-colors duration-75 flex items-center gap-2"
                 style={{
                   color: active ? 'var(--accent)' : 'var(--text)',
                   background: active ? 'var(--accent-faint)' : 'transparent',
@@ -109,13 +114,10 @@ export function CustomSelect({
                   (e.currentTarget as HTMLElement).style.background = active ? 'var(--accent-faint)' : 'transparent';
                 }}
               >
-                <span
-                  className="w-4 text-center text-xs font-black flex-shrink-0"
-                  style={{ color: 'var(--accent)' }}
-                >
+                <span className="w-3 flex-shrink-0 text-center text-xs" style={{ color: 'var(--accent)' }}>
                   {active ? '✓' : ''}
                 </span>
-                <span className="font-bold">{opt.label}</span>
+                <span>{opt.label}</span>
               </button>
             );
           })}

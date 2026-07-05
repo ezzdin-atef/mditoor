@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { marked } from 'marked';
+import { useTranslation } from 'react-i18next';
+import { pickImageFile, uploadImage } from '../../assets/imageUpload';
 import { useRouter } from '../../../router';
-import { COLORS, useStore } from '../../workspace/store';
+import { useStore } from '../../workspace/store';
 import {
   EDITOR_FONT,
   EDITOR_FONT_SIZE,
   EDITOR_LINE_HEIGHT,
   useSettings,
 } from '../../settings/store';
-import { Toolbar } from '../components/Toolbar';
+import { FloatingToolbar } from '../components/FloatingToolbar';
+import { BlockEditor } from '../components/BlockEditor';
 import { MetadataSidebar } from '../components/MetadataSidebar';
 import {
   buildContent,
@@ -19,32 +22,27 @@ import {
 } from '../utils/frontmatter';
 
 type ViewMode = 'edit' | 'split' | 'preview';
-type TextDir  = 'ltr' | 'rtl' | 'auto';
-
-const MODE_ICONS: Record<ViewMode, string> = {
-  edit:    '✏️',
-  split:   '⚡',
-  preview: '👁️',
-};
+type EditorMode = 'blocks' | 'markdown';
 
 export function EditorPage() {
   const { route, navigate } = useRouter();
   const { workspaces } = useStore();
   const settings = useSettings();
+  const { t } = useTranslation();
 
   if (route.page !== 'editor') return null;
 
   const workspace = workspaces.find(w => w.id === route.workspaceId) ?? null;
-  const color     = workspace ? COLORS[workspace.colorIdx % COLORS.length] : COLORS[0];
 
   const [body,       setBodyRaw]    = useState('');
   const [meta,       setMeta]       = useState<MetaValues>({});
   const [viewMode,   setViewMode]   = useState<ViewMode>('edit');
-  const [textDir,    setTextDir]    = useState<TextDir>('ltr');
+  const [editorMode, setEditorMode] = useState<EditorMode>('blocks');
   const [loading,    setLoading]    = useState(true);
   const [saving,     setSaving]     = useState(false);
   const [dirty,      setDirty]      = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -55,6 +53,10 @@ export function EditorPage() {
 
   useEffect(() => {
     if (!workspace) { setLoading(false); return; }
+    setLoading(true);
+    setSaveStatus('idle');
+    setDirty(false);
+    setUploadMessage(null);
     if (route.isNew) {
       setMeta(defaultMeta(workspace.metadataFields));
       setBodyRaw('');
@@ -71,35 +73,14 @@ export function EditorPage() {
         setMeta(defaultMeta(workspace?.metadataFields ?? []));
         setBodyRaw('');
       })
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => {
+        setDirty(false);
+        setLoading(false);
+      });
+  }, [workspace?.id, route.slug, route.isNew]);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const mod = e.ctrlKey || e.metaKey;
-      if (mod && e.key === 's') { e.preventDefault(); save(); }
-      if (mod && e.key === 'b') { e.preventDefault(); wrapInline('**'); }
-      if (mod && e.key === 'i') { e.preventDefault(); wrapInline('*'); }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [body, meta]);
-
-  const wrapInline = (mark: string) => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    const s   = ta.selectionStart;
-    const e   = ta.selectionEnd;
-    const sel = body.slice(s, e) || 'text';
-    setBody(body.slice(0, s) + mark + sel + mark + body.slice(e));
-    requestAnimationFrame(() => {
-      ta.setSelectionRange(s + mark.length, s + mark.length + sel.length);
-      ta.focus();
-    });
-  };
-
-  const save = async () => {
-    if (!workspace || saving) return;
+  const save = useCallback(async () => {
+    if (!workspace || saving || !dirty) return;
     setSaving(true);
     setSaveStatus('saving');
     try {
@@ -114,7 +95,77 @@ export function EditorPage() {
     } finally {
       setSaving(false);
     }
+  }, [body, dirty, meta, route.slug, saving, workspace]);
+
+  const wrapInline = (mark: string) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const s   = ta.selectionStart;
+    const e   = ta.selectionEnd;
+    const sel = body.slice(s, e) || 'text';
+    setBody(body.slice(0, s) + mark + sel + mark + body.slice(e));
+    requestAnimationFrame(() => {
+      ta.setSelectionRange(s + mark.length, s + mark.length + sel.length);
+      ta.focus();
+    });
   };
+
+  // Shared upload handler: pick a file → upload per workspace storage → return URL
+  const handleUploadImage = useCallback(async (): Promise<string | null> => {
+    if (!workspace) return null;
+    try {
+      const filePath = await pickImageFile();
+      if (!filePath) return null;
+      const url = await uploadImage(filePath, workspace.storage);
+      setUploadMessage(null);
+      return url;
+    } catch (e) {
+      console.error('Upload failed:', e);
+      setUploadMessage(e instanceof Error ? e.message : t('storage.notConfiguredHint'));
+      return null;
+    }
+  }, [t, workspace]);
+
+  // Upload an image and insert MDX syntax at cursor
+  const handleInsertImage = useCallback(async () => {
+    const url = await handleUploadImage();
+    if (!url) return;
+    const filename = url.split('/').pop()?.replace(/\.[^.]+$/, '') ?? 'image';
+    const md = `![${filename}](${url})`;
+    const ta = textareaRef.current;
+    if (ta) {
+      const s = ta.selectionStart;
+      setBody(body.slice(0, s) + md + body.slice(s));
+      requestAnimationFrame(() => {
+        ta.setSelectionRange(s + md.length, s + md.length);
+        ta.focus();
+      });
+    } else {
+      setBody(body + md);
+    }
+  }, [handleUploadImage, body, setBody]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && e.key === 's') { e.preventDefault(); void save(); }
+      if (mod && e.key === 'b') { e.preventDefault(); wrapInline('**'); }
+      if (mod && e.shiftKey && e.key.toLowerCase() === 'i') {
+        e.preventDefault();
+        void handleInsertImage();
+        return;
+      }
+      if (mod && e.key === 'i') { e.preventDefault(); wrapInline('*'); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [body, handleInsertImage, save]);
+
+  useEffect(() => {
+    if (!settings.autoSave || !dirty || loading || saving) return;
+    const id = window.setTimeout(() => { void save(); }, settings.autoSaveInterval);
+    return () => window.clearTimeout(id);
+  }, [dirty, loading, save, saving, settings.autoSave, settings.autoSaveInterval]);
 
   const editorStyle = {
     fontFamily: EDITOR_FONT[settings.editorFont],
@@ -130,20 +181,15 @@ export function EditorPage() {
   if (!workspace) {
     return (
       <div
-        className="flex flex-col items-center justify-center h-screen gap-5 animate-slide-up"
+        className="flex flex-col items-center justify-center h-screen gap-4 mac-fade-in"
         style={{ background: 'var(--bg)' }}
       >
-        <div className="text-7xl animate-float select-none">😱</div>
-        <p className="text-lg font-black" style={{ color: 'var(--text)' }}>Workspace not found!</p>
+        <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{t('editor.notFound')}</p>
         <button
           onClick={() => navigate({ page: 'workspace' })}
-          className="joy-btn px-6 py-3 rounded-2xl text-white font-black text-sm"
-          style={{
-            background: 'linear-gradient(135deg, #a78bfa, #7c3aed)',
-            boxShadow: '0 6px 22px rgba(167,139,250,0.42)',
-          }}
+          className="mac-btn mac-btn-primary"
         >
-          ← Go back
+          {t('editor.goBack')}
         </button>
       </div>
     );
@@ -156,119 +202,93 @@ export function EditorPage() {
     >
       {/* ═══ Header ═══ */}
       <header
-        className="flex items-center gap-3 px-4 flex-shrink-0"
-        style={{
-          background: 'var(--sb-bg)',
-          borderBottom: '1px solid var(--sb-border)',
-          minHeight: '52px',
-        }}
+        className="editor-header flex items-center gap-2 px-3 flex-shrink-0 border-b"
       >
-        {/* Back + workspace badge */}
+        {/* Back */}
         <button
           onClick={() => navigate({ page: 'workspace' })}
-          className="joy-btn flex items-center gap-2 flex-shrink-0"
+          className="editor-back-btn flex items-center gap-1.5 flex-shrink-0"
         >
-          <span className="text-sm leading-none" style={{ color: 'var(--sb-muted)' }}>←</span>
+          <span className="rtl-mirror text-xs" style={{ color: 'var(--sb-muted)' }}>&larr;</span>
           <div
-            className="w-6 h-6 rounded-xl flex items-center justify-center text-white text-[11px] font-black"
-            style={{
-              background: `linear-gradient(135deg, ${color.start}, ${color.end})`,
-              boxShadow: `0 2px 8px ${color.start}55`,
-            }}
+            className="editor-workspace-icon flex-shrink-0"
+            aria-hidden="true"
           >
-            {workspace.name[0]?.toUpperCase() ?? '?'}
+            {workspace.icon}
           </div>
-          <span
-            className="text-xs font-bold hidden sm:block"
-            style={{ color: 'var(--sb-muted)' }}
-          >
+          <span className="text-xs hidden sm:block" style={{ color: 'var(--sb-muted)' }}>
             {workspace.name}
           </span>
         </button>
 
         {/* Divider */}
-        <div
-          className="w-px h-4 flex-shrink-0"
-          style={{ background: 'var(--sb-border)' }}
-        />
+        <div className="w-px h-3.5 flex-shrink-0" style={{ background: 'var(--sb-border)' }} />
 
         {/* Breadcrumb */}
-        <div className="flex items-center gap-1 min-w-0 flex-1">
+        <div className="flex items-center gap-0.5 min-w-0 flex-1">
           <span
-            className="text-xs font-mono font-bold truncate"
-            style={{ color: 'rgba(234,213,255,0.55)' }}
+            className="text-xs mac-input-mono truncate"
+            style={{ color: 'var(--sb-muted)' }}
           >
             {route.slug}
           </span>
-          <span
-            className="text-xs font-mono flex-shrink-0"
-            style={{ color: 'rgba(234,213,255,0.2)' }}
-          >
+          <span className="text-xs mac-input-mono flex-shrink-0" style={{ color: 'var(--sb-muted)', opacity: 0.45 }}>
             /index.mdx
           </span>
           {route.isNew && (
             <span
-              className="ml-1 text-[10px] px-2 py-0.5 rounded-full font-black flex-shrink-0 animate-pop"
-              style={{ background: 'rgba(167,139,250,0.25)', color: '#a78bfa' }}
+              className="text-[10px] px-1.5 py-0.5 flex-shrink-0 mac-fade-slide"
+              style={{ marginInlineStart: '0.375rem', background: 'var(--accent-faint)', color: 'var(--accent)' }}
             >
-              new ✨
+              {t('editor.new')}
             </span>
           )}
         </div>
 
-        {/* Save status indicators */}
+        {/* Save status */}
         {dirty && saveStatus === 'idle' && (
           <div
-            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-            style={{ background: color.start }}
-            title="Unsaved changes"
+            className="editor-dirty-dot flex-shrink-0"
+            title={t('editor.unsaved')}
           />
         )}
         {saveStatus === 'saving' && (
-          <span
-            className="text-[11px] font-black flex-shrink-0"
-            style={{ color: 'rgba(234,213,255,0.45)' }}
-          >
-            Saving...
+          <span className="text-[11px] flex-shrink-0" style={{ color: 'var(--sb-muted)' }}>
+            {t('editor.saving')}
           </span>
         )}
         {saveStatus === 'saved' && (
-          <span
-            className="text-[11px] font-black flex-shrink-0 animate-pop"
-            style={{ color: 'var(--joy-green)' }}
-          >
-            ✓ Saved!
+          <span className="text-[11px] flex-shrink-0 mac-fade-slide" style={{ color: 'var(--green)' }}>
+            {t('editor.saved')}
           </span>
         )}
         {saveStatus === 'error' && (
-          <span className="text-[11px] font-black flex-shrink-0" style={{ color: '#f87171' }}>
-            ✕ Error
-          </span>
+          <span className="text-[11px] flex-shrink-0" style={{ color: 'var(--red)' }}>{t('editor.error')}</span>
         )}
 
-        {/* View mode switcher */}
-        <div
-          className="flex items-center gap-0.5 p-1 rounded-2xl flex-shrink-0"
-          style={{ background: 'rgba(255,255,255,0.07)' }}
-        >
+        {/* View mode segment control */}
+        <div className="mac-segmented flex-shrink-0">
+          {(['blocks', 'markdown'] as EditorMode[]).map(m => (
+            <button
+              key={m}
+              onClick={() => setEditorMode(m)}
+              title={t(`editor.${m}`)}
+              className={`mac-segment${editorMode === m ? ' active' : ''}`}
+            >
+              {t(`editor.${m}`)}
+            </button>
+          ))}
+        </div>
+
+        <div className="mac-segmented flex-shrink-0">
           {(['edit', 'split', 'preview'] as ViewMode[]).map(m => (
             <button
               key={m}
               onClick={() => setViewMode(m)}
-              title={`${m[0].toUpperCase() + m.slice(1)} mode`}
-              className="joy-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black capitalize transition-all duration-150"
-              style={
-                viewMode === m
-                  ? {
-                      background: `linear-gradient(135deg, ${color.start}, ${color.end})`,
-                      color: '#fff',
-                      boxShadow: `0 2px 10px ${color.start}55`,
-                    }
-                  : { color: 'rgba(234,213,255,0.35)', background: 'transparent' }
-              }
+              title={t(`editor.${m}`)}
+              className={`mac-segment${viewMode === m ? ' active' : ''}`}
             >
-              <span className="text-sm leading-none">{MODE_ICONS[m]}</span>
-              <span className="hidden sm:inline">{m}</span>
+              {t(`editor.${m}`)}
             </button>
           ))}
         </div>
@@ -277,26 +297,19 @@ export function EditorPage() {
         <button
           onClick={save}
           disabled={saving || !dirty}
-          className="joy-btn flex-shrink-0 px-5 py-2 rounded-2xl text-xs font-black text-white disabled:opacity-30 disabled:cursor-not-allowed"
-          style={{
-            background: `linear-gradient(135deg, ${color.start}, ${color.end})`,
-            boxShadow: dirty ? `0 4px 16px ${color.start}55` : 'none',
-          }}
+          className="mac-btn mac-btn-primary flex-shrink-0 disabled:opacity-30"
         >
-          {saving ? '...' : '💾 Save'}
+          {saving ? '...' : t('editor.save')}
         </button>
       </header>
 
       {/* ═══ Body ═══ */}
       {loading ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 animate-slide-up">
-          <div className="text-5xl animate-spin-joy select-none">⭐</div>
-          <p className="text-sm font-black" style={{ color: 'var(--text-faint)' }}>
-            Loading post...
-          </p>
+        <div className="flex-1 flex flex-col items-center justify-center gap-3">
+          <p className="text-sm" style={{ color: 'var(--text-faint)' }}>{t('common.loading')}</p>
         </div>
       ) : (
-        <div className="flex-1 flex overflow-hidden">
+        <div className="editor-body flex-1 flex overflow-hidden">
           {/* Metadata sidebar */}
           {viewMode !== 'preview' && (
             <MetadataSidebar
@@ -306,6 +319,9 @@ export function EditorPage() {
                 setMeta(prev => ({ ...prev, [key]: val }));
                 setDirty(true);
               }}
+              body={body}
+              slug={route.slug}
+              onUploadImage={handleUploadImage}
             />
           )}
 
@@ -314,122 +330,137 @@ export function EditorPage() {
             {/* Edit pane */}
             {(viewMode === 'edit' || viewMode === 'split') && (
               <div
-                className="flex flex-col overflow-hidden"
+                className="editor-pane flex flex-col overflow-hidden"
                 style={{
                   flex: viewMode === 'split' ? '0 0 50%' : '1 1 0',
-                  borderRight: viewMode === 'split' ? '2px solid var(--border)' : 'none',
-                }}
-              >
-                <Toolbar
-                  textareaRef={textareaRef}
-                  body={body}
-                  setBody={setBody}
-                  dir={textDir}
-                  onDirChange={setTextDir}
-                />
+                  borderInlineEnd: viewMode === 'split' ? '1px solid var(--border)' : 'none',
+              }}
+            >
+                {uploadMessage && (
+                  <div
+                    className="mx-auto mt-3 max-w-2xl rounded px-3 py-2 text-xs mac-fade-slide"
+                    style={{
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    <strong style={{ color: 'var(--text)' }}>{t('storage.notConfigured')}.</strong>{' '}
+                    {uploadMessage}
+                  </div>
+                )}
+                {editorMode === 'blocks' ? (
+                  <div className="editor-scroll flex-1 overflow-y-auto">
+                    <BlockEditor
+                      value={body}
+                      onChange={setBody}
+                      editorStyle={editorStyle}
+                      onInsertImage={handleUploadImage}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <textarea
+                      ref={textareaRef}
+                      value={body}
+                      dir="auto"
+                      onChange={e => setBody(e.target.value)}
+                      onKeyDown={e => {
+                        const ta = e.currentTarget;
 
-                <textarea
-                  ref={textareaRef}
-                  value={body}
-                  dir={textDir}
-                  onChange={e => setBody(e.target.value)}
-                  onKeyDown={e => {
-                    const ta = e.currentTarget;
-
-                    if (e.key === 'Tab') {
-                      e.preventDefault();
-                      const s   = ta.selectionStart;
-                      const nxt = body.slice(0, s) + '  ' + body.slice(s);
-                      setBody(nxt);
-                      requestAnimationFrame(() => ta.setSelectionRange(s + 2, s + 2));
-                      return;
-                    }
-
-                    if (e.key === 'Enter' && !e.shiftKey && ta.selectionStart === ta.selectionEnd) {
-                      const s         = ta.selectionStart;
-                      const lineStart = body.lastIndexOf('\n', s - 1) + 1;
-                      const line      = body.slice(lineStart, s);
-
-                      const bulletM  = /^(\s*)([-*+])\s(.*)$/.exec(line);
-                      const orderedM = /^(\s*)(\d+)\.\s(.*)$/.exec(line);
-                      const quoteM   = /^(>+\s?)(.*)$/.exec(line);
-
-                      if (bulletM) {
-                        e.preventDefault();
-                        const [, indent, marker, content] = bulletM;
-                        if (!content.trim()) {
-                          setBody(body.slice(0, lineStart) + body.slice(s));
-                          requestAnimationFrame(() => { ta.setSelectionRange(lineStart, lineStart); ta.focus(); });
-                        } else {
-                          const cont = `\n${indent}${marker} `;
-                          setBody(body.slice(0, s) + cont + body.slice(s));
-                          requestAnimationFrame(() => { ta.setSelectionRange(s + cont.length, s + cont.length); ta.focus(); });
+                        if (e.key === 'Tab') {
+                          e.preventDefault();
+                          const s   = ta.selectionStart;
+                          const nxt = body.slice(0, s) + '  ' + body.slice(s);
+                          setBody(nxt);
+                          requestAnimationFrame(() => ta.setSelectionRange(s + 2, s + 2));
+                          return;
                         }
-                      } else if (orderedM) {
-                        e.preventDefault();
-                        const [, indent, numStr, content] = orderedM;
-                        if (!content.trim()) {
-                          setBody(body.slice(0, lineStart) + body.slice(s));
-                          requestAnimationFrame(() => { ta.setSelectionRange(lineStart, lineStart); ta.focus(); });
-                        } else {
-                          const cont = `\n${indent}${parseInt(numStr, 10) + 1}. `;
-                          setBody(body.slice(0, s) + cont + body.slice(s));
-                          requestAnimationFrame(() => { ta.setSelectionRange(s + cont.length, s + cont.length); ta.focus(); });
+
+                        if (e.key === 'Enter' && !e.shiftKey && ta.selectionStart === ta.selectionEnd) {
+                          const s         = ta.selectionStart;
+                          const lineStart = body.lastIndexOf('\n', s - 1) + 1;
+                          const line      = body.slice(lineStart, s);
+
+                          const bulletM  = /^(\s*)([-*+])\s(.*)$/.exec(line);
+                          const orderedM = /^(\s*)(\d+)\.\s(.*)$/.exec(line);
+                          const quoteM   = /^(>+\s?)(.*)$/.exec(line);
+
+                          if (bulletM) {
+                            e.preventDefault();
+                            const [, indent, marker, content] = bulletM;
+                            if (!content.trim()) {
+                              setBody(body.slice(0, lineStart) + body.slice(s));
+                              requestAnimationFrame(() => { ta.setSelectionRange(lineStart, lineStart); ta.focus(); });
+                            } else {
+                              const cont = `\n${indent}${marker} `;
+                              setBody(body.slice(0, s) + cont + body.slice(s));
+                              requestAnimationFrame(() => { ta.setSelectionRange(s + cont.length, s + cont.length); ta.focus(); });
+                            }
+                          } else if (orderedM) {
+                            e.preventDefault();
+                            const [, indent, numStr, content] = orderedM;
+                            if (!content.trim()) {
+                              setBody(body.slice(0, lineStart) + body.slice(s));
+                              requestAnimationFrame(() => { ta.setSelectionRange(lineStart, lineStart); ta.focus(); });
+                            } else {
+                              const cont = `\n${indent}${parseInt(numStr, 10) + 1}. `;
+                              setBody(body.slice(0, s) + cont + body.slice(s));
+                              requestAnimationFrame(() => { ta.setSelectionRange(s + cont.length, s + cont.length); ta.focus(); });
+                            }
+                          } else if (quoteM) {
+                            e.preventDefault();
+                            const [, prefix, content] = quoteM;
+                            if (!content.trim()) {
+                              setBody(body.slice(0, lineStart) + body.slice(s));
+                              requestAnimationFrame(() => { ta.setSelectionRange(lineStart, lineStart); ta.focus(); });
+                            } else {
+                              const cont = `\n${prefix}`;
+                              setBody(body.slice(0, s) + cont + body.slice(s));
+                              requestAnimationFrame(() => { ta.setSelectionRange(s + cont.length, s + cont.length); ta.focus(); });
+                            }
+                          }
                         }
-                      } else if (quoteM) {
-                        e.preventDefault();
-                        const [, prefix, content] = quoteM;
-                        if (!content.trim()) {
-                          setBody(body.slice(0, lineStart) + body.slice(s));
-                          requestAnimationFrame(() => { ta.setSelectionRange(lineStart, lineStart); ta.focus(); });
-                        } else {
-                          const cont = `\n${prefix}`;
-                          setBody(body.slice(0, s) + cont + body.slice(s));
-                          requestAnimationFrame(() => { ta.setSelectionRange(s + cont.length, s + cont.length); ta.focus(); });
-                        }
-                      }
-                    }
-                  }}
-                  spellCheck
-                  placeholder={
-                    textDir === 'rtl'
-                      ? 'ابدأ الكتابة هنا…\n\nنصائح:\n  - استخدم شريط الأدوات لتنسيق النص\n  - Ctrl+B للخط العريض، Ctrl+I للمائل\n  - Ctrl+S للحفظ'
-                      : 'Start writing your MDX here…\n\nTips:\n  · Toolbar above formats selected text\n  · Ctrl+B bold  ·  Ctrl+I italic\n  · Ctrl+S save  ·  Tab inserts 2 spaces'
-                  }
-                  className="flex-1 resize-none focus:outline-none"
-                  style={{
-                    ...editorStyle,
-                    background: 'var(--surface)',
-                    color: 'var(--text)',
-                    caretColor: color.start,
-                    padding: '2rem 2.5rem',
-                    unicodeBidi: textDir === 'rtl' ? 'plaintext' : undefined,
-                  }}
-                />
+                      }}
+                      spellCheck
+                      placeholder={t('editor.placeholder')}
+                      className="editor-markdown-textarea flex-1 resize-none focus:outline-none"
+                      style={{
+                        ...editorStyle,
+                        unicodeBidi: 'plaintext',
+                        textAlign: 'start',
+                      }}
+                    />
+                    <FloatingToolbar
+                      textareaRef={textareaRef}
+                      body={body}
+                      setBody={setBody}
+                      onInsertImage={handleInsertImage}
+                    />
+                  </>
+                )}
               </div>
             )}
 
             {/* Preview pane */}
             {(viewMode === 'preview' || viewMode === 'split') && (
               <div
-                className="flex-1 overflow-y-auto"
-                style={{ background: 'var(--surface)' }}
+                className="editor-preview-pane flex-1 overflow-y-auto"
               >
                 {body.trim() === '' ? (
                   <div className="flex flex-col items-center justify-center h-full text-center px-8">
-                    <div className="text-5xl mb-4 select-none animate-float opacity-30">📄</div>
-                    <p className="text-sm font-black" style={{ color: 'var(--text-faint)' }}>
-                      Nothing to preview yet
+                    <p className="text-sm" style={{ color: 'var(--text-faint)' }}>
+                      {t('editor.noPreview')}
                     </p>
-                    <p className="text-xs mt-1 font-bold" style={{ color: 'var(--text-faint)' }}>
-                      Switch to Edit mode and start writing.
+                    <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>
+                      {t('editor.noPreviewHint')}
                     </p>
                   </div>
                 ) : (
                   <div
-                    dir={textDir}
-                    className="prose max-w-2xl mx-auto px-10 py-10"
-                    style={{ color: 'var(--text)' }}
+                    dir="auto"
+                    className="prose editor-prose"
+                    style={{ color: 'var(--text)', unicodeBidi: 'plaintext' }}
                     dangerouslySetInnerHTML={{ __html: previewHtml }}
                   />
                 )}

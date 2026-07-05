@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 
 export function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
@@ -7,6 +8,7 @@ export function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
   const [mdxPath, setMdxPath] = useState('');
   const [picking, setPicking] = useState(false);
   const { addWorkspace } = useStore();
+  const { t } = useTranslation();
 
   const handleBrowse = async () => {
     setPicking(true);
@@ -18,178 +20,123 @@ export function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !mdxPath.trim()) return;
-    addWorkspace(name.trim(), mdxPath.trim());
+    await addWorkspace(name.trim(), mdxPath.trim());
     onClose();
   };
 
   return (
     <div
       className="fixed inset-0 flex items-center justify-center z-50 p-4"
-      style={{ background: 'rgba(10,2,30,0.72)', backdropFilter: 'blur(10px)' }}
+      style={{ background: 'rgba(0,0,0,0.32)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-slide-up"
+        className="w-full max-w-sm mac-sheet"
         style={{
-          background: 'var(--surface)',
-          border: '2px solid var(--border)',
-          boxShadow: '0 32px 80px rgba(124,58,237,0.3)',
+          background: 'var(--bg)',
+          border: '1px solid var(--border-2)',
+          borderRadius: 8,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
         }}
       >
-        {/* Fun header */}
+        {/* Header */}
         <div
-          className="relative px-7 py-6 overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #a78bfa 0%, #ec4899 100%)' }}
+          className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: '1px solid var(--border)' }}
         >
-          {/* Decorative blobs */}
-          <div
-            className="absolute -right-6 -top-6 w-28 h-28 rounded-full"
-            style={{ background: 'rgba(255,255,255,0.12)' }}
-          />
-          <div
-            className="absolute -right-2 bottom-0 w-20 h-20 rounded-full"
-            style={{ background: 'rgba(255,255,255,0.07)' }}
-          />
-
-          <div className="relative z-10">
-            <div className="text-4xl mb-2 animate-float select-none">🚀</div>
-            <h2 className="text-white font-black text-xl leading-tight">New Workspace</h2>
-            <p className="text-white/65 text-xs mt-1 font-bold">
-              Point to your MDX posts folder
+          <div>
+            <h2 className="text-[16px] font-semibold" style={{ color: 'var(--text)' }}>
+              {t('workspace.new')}
+            </h2>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {t('workspace.folderHint')}
             </p>
           </div>
-
           <button
             onClick={onClose}
-            className="joy-btn absolute top-4 right-4 w-8 h-8 rounded-xl flex items-center justify-center font-black text-lg"
-            style={{ color: 'rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.1)' }}
-            aria-label="Close"
+            className="w-7 h-7 flex items-center justify-center text-base leading-none toolbar-btn"
+            style={{ color: 'var(--text-muted)' }}
+            aria-label={t('common.close')}
           >
             &times;
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-7 space-y-5">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {/* Name */}
           <div>
             <label
-              className="block text-[10px] font-black uppercase tracking-[0.18em] mb-2"
+              className="block text-xs font-medium mb-1.5"
               style={{ color: 'var(--text-muted)' }}
             >
-              Workspace Name
+              {t('workspace.name')}
             </label>
             <input
               autoFocus
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="My Blog, Portfolio, Docs..."
-              className="w-full px-4 py-3 rounded-2xl border-2 text-sm font-bold transition-all duration-150"
-              style={{
-                background: 'var(--surface-2)',
-                borderColor: 'var(--border)',
-                color: 'var(--text)',
-                outline: 'none',
-              }}
-              onFocus={e => {
-                (e.target as HTMLInputElement).style.borderColor = 'var(--accent)';
-                (e.target as HTMLInputElement).style.boxShadow = '0 0 0 4px var(--accent-faint)';
-              }}
-              onBlur={e => {
-                (e.target as HTMLInputElement).style.borderColor = 'var(--border)';
-                (e.target as HTMLInputElement).style.boxShadow = 'none';
-              }}
+              placeholder={t('workspace.namePlaceholder')}
+              className="mac-input"
             />
           </div>
 
           {/* Posts folder */}
           <div>
             <label
-              className="block text-[10px] font-black uppercase tracking-[0.18em] mb-2"
+              className="block text-xs font-medium mb-1.5"
               style={{ color: 'var(--text-muted)' }}
             >
-              Posts Folder
+              {t('workspace.postsFolder')}
             </label>
-            <p className="text-xs font-bold mb-2.5" style={{ color: 'var(--text-faint)' }}>
-              The folder where your{' '}
+            <p className="text-xs mb-2" style={{ color: 'var(--text-faint)' }}>
+              {t('workspace.folderContains')}{' '}
               <code
-                className="px-1.5 py-0.5 rounded-lg font-mono text-[11px]"
-                style={{ background: 'var(--surface-3)', color: 'var(--accent)', border: '1px solid var(--border)' }}
+                className="px-1 py-0.5 text-[11px] mac-input-mono"
+                style={{ background: 'var(--surface-2)', border: '1px solid var(--border-2)', color: 'var(--text-muted)' }}
               >
                 [slug]/index.mdx
               </code>{' '}
-              files live.
+              {t('workspace.filesSuffix')}
             </p>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={mdxPath}
                 onChange={e => setMdxPath(e.target.value)}
-                placeholder="/path/to/posts"
-                className="flex-1 px-4 py-3 rounded-2xl border-2 text-sm font-mono font-bold transition-all duration-150"
-                style={{
-                  background: 'var(--surface-2)',
-                  borderColor: 'var(--border)',
-                  color: 'var(--text)',
-                  outline: 'none',
-                }}
-                onFocus={e => {
-                  (e.target as HTMLInputElement).style.borderColor = 'var(--accent)';
-                  (e.target as HTMLInputElement).style.boxShadow = '0 0 0 4px var(--accent-faint)';
-                }}
-                onBlur={e => {
-                  (e.target as HTMLInputElement).style.borderColor = 'var(--border)';
-                  (e.target as HTMLInputElement).style.boxShadow = 'none';
-                }}
+                placeholder={t('workspace.pathPlaceholder')}
+                className="mac-input mac-input-mono flex-1"
               />
               <button
                 type="button"
                 onClick={handleBrowse}
                 disabled={picking}
-                className="joy-btn flex-shrink-0 flex items-center gap-1.5 px-4 py-3 rounded-2xl text-sm font-black border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  borderColor: 'var(--border)',
-                  background: 'var(--surface-2)',
-                  color: 'var(--text-muted)',
-                }}
+                className="mac-btn flex-shrink-0 disabled:opacity-50"
               >
-                {picking ? (
-                  <span className="animate-spin-joy inline-block">⭐</span>
-                ) : (
-                  <>📁 Browse</>
-                )}
+                {picking ? '...' : t('workspace.browse')}
               </button>
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-1">
+          <div className="flex gap-2 pt-1" style={{ borderTop: '1px solid var(--border-2)' }}>
             <button
               type="button"
               onClick={onClose}
-              className="joy-btn flex-1 px-4 py-3 rounded-2xl text-sm font-black border-2 transition-all"
-              style={{
-                borderColor: 'var(--border)',
-                background: 'var(--surface-2)',
-                color: 'var(--text-muted)',
-              }}
+              className="mac-btn flex-1 mt-3"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
               disabled={!name.trim() || !mdxPath.trim()}
-              className="joy-btn flex-1 px-4 py-3 rounded-2xl text-sm font-black text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{
-                background: 'linear-gradient(135deg, #a78bfa 0%, #ec4899 100%)',
-                boxShadow: name.trim() && mdxPath.trim() ? '0 4px 18px rgba(167,139,250,0.42)' : 'none',
-              }}
+              className="mac-btn mac-btn-primary flex-1 mt-3 disabled:opacity-40"
             >
-              ✨ Create Workspace
+              {t('workspace.create')}
             </button>
           </div>
         </form>

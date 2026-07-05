@@ -21,4 +21,14 @@ dist-ssr
 *.ntvs*
 *.njsproj
 *.sln
-*.sw?
+*.sw?'
+.agents
+.claude
+.codex
+.cursor
+.gemini
+.impeccable
+.vscode
+
+DESIGN.md
+PRODUCT.md
