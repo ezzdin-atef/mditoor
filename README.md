@@ -88,10 +88,10 @@ Define frontmatter fields per workspace. Supported field types: `text`, `select`
 ```json
 {
   "fields": [
-    { "name": "title",    "type": "text",    "required": true },
-    { "name": "date",     "type": "date",    "required": true },
-    { "name": "status",   "type": "select",  "options": ["draft", "published"] },
-    { "name": "tags",     "type": "tags" },
+    { "name": "title", "type": "text", "required": true },
+    { "name": "date", "type": "date", "required": true },
+    { "name": "status", "type": "select", "options": ["draft", "published"] },
+    { "name": "tags", "type": "tags" },
     { "name": "featured", "type": "boolean" }
   ]
 }
@@ -101,13 +101,13 @@ Define frontmatter fields per workspace. Supported field types: `text`, `select`
 
 ## Tech Stack
 
-| Layer     | Technology                         |
-|-----------|------------------------------------|
-| Desktop   | Tauri v2, Rust                     |
-| Frontend  | React 19, TypeScript, Vite         |
-| UI        | Tailwind CSS v4                    |
-| State     | Zustand, TanStack Query            |
-| i18n      | i18next (English, Arabic, French)  |
+| Layer    | Technology                        |
+| -------- | --------------------------------- |
+| Desktop  | Tauri v2, Rust                    |
+| Frontend | React 19, TypeScript, Vite        |
+| UI       | Tailwind CSS v4                   |
+| State    | Zustand, TanStack Query           |
+| i18n     | i18next (English, Arabic, French) |
 
 ---
 
@@ -179,12 +179,6 @@ npm run tauri -- icon src-tauri/icons/icon-source.svg
 ## Contributing
 
 Contributions are welcome. Please open an issue before submitting large changes.
-
----
-
-## License
-
-MIT
 
 ---
 
