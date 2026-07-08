@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { useTranslation } from 'react-i18next';
 import { useConfirmDialog } from '../../../components/ConfirmDialog';
 
 interface GitFile {
@@ -32,18 +33,18 @@ interface OpState {
 
 const IDLE: OpState = { running: false, output: null, error: null };
 
-const STATUS_META: Record<string, { label: string; color: string }> = {
-  M:   { label: 'modified',  color: 'var(--accent)'      },
-  A:   { label: 'added',     color: 'var(--green)'       },
-  D:   { label: 'deleted',   color: 'var(--red)'         },
-  R:   { label: 'renamed',   color: 'var(--orange)'      },
-  C:   { label: 'copied',    color: 'var(--orange)'      },
-  U:   { label: 'conflict',  color: 'var(--orange)'      },
-  '?': { label: 'untracked', color: 'var(--text-muted)'  },
+const STATUS_META: Record<string, { labelKey: string; color: string }> = {
+  M:   { labelKey: 'modified',  color: 'var(--accent)'      },
+  A:   { labelKey: 'added',     color: 'var(--green)'       },
+  D:   { labelKey: 'deleted',   color: 'var(--red)'         },
+  R:   { labelKey: 'renamed',   color: 'var(--orange)'      },
+  C:   { labelKey: 'copied',    color: 'var(--orange)'      },
+  U:   { labelKey: 'conflict',  color: 'var(--orange)'      },
+  '?': { labelKey: 'untracked', color: 'var(--text-muted)'  },
 };
 
 function statusMeta(c: string) {
-  return STATUS_META[c] ?? { label: c, color: 'var(--text-muted)' };
+  return STATUS_META[c] ?? { labelKey: c, color: 'var(--text-muted)' };
 }
 
 function isStaged(f: GitFile)   { return f.staged !== ' ' && f.staged !== '?'; }
@@ -52,10 +53,11 @@ function isUnstaged(f: GitFile) { return f.unstaged !== ' ' || f.staged === '?';
 // ── Diff renderer ─────────────────────────────────────────────────────────────
 
 function DiffView({ diff }: { diff: string }) {
+  const { t } = useTranslation();
   if (!diff.trim()) {
     return (
       <p className="text-[11px] px-3 py-2 italic" style={{ color: 'var(--text-faint)' }}>
-        No diff available (new untracked file)
+        {t('git.noDiff')}
       </p>
     );
   }
@@ -88,6 +90,7 @@ function FileRow({ file, mdxPath, section, onAction }: {
   section: 'staged' | 'unstaged';
   onAction: () => void;
 }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [diff, setDiff]         = useState<string | null>(null);
   const [loadingDiff, setLoadingDiff] = useState(false);
@@ -116,9 +119,9 @@ function FileRow({ file, mdxPath, section, onAction }: {
   const handleUnstage = () => act(() => invoke('git_unstage_file', { mdxPath, filePath: file.path }));
   const handleDiscard = async () => {
     const confirmed = await confirm({
-      title: 'Discard changes?',
-      message: `Discard changes to "${file.path}"? This cannot be undone.`,
-      confirmLabel: 'Discard',
+      title: t('git.discardTitle'),
+      message: t('git.discardConfirm', { path: file.path }),
+      confirmLabel: t('git.discard'),
     });
     if (!confirmed) return;
     void act(() => invoke('git_discard_file', { mdxPath, filePath: file.path }));
@@ -138,10 +141,10 @@ function FileRow({ file, mdxPath, section, onAction }: {
           className="text-[9px] font-bold mac-input-mono px-1.5 py-px flex-shrink-0"
           style={{ background: `color-mix(in srgb, ${meta.color} 12%, transparent)`, color: meta.color, borderRadius: 3 }}
         >
-          {meta.label}
+          {t(`git.status.${meta.labelKey}`, { defaultValue: meta.labelKey })}
         </span>
 
-        <button onClick={toggleDiff} className="flex-1 min-w-0 text-left" title="Toggle diff">
+        <button onClick={toggleDiff} className="flex-1 min-w-0 text-left" title={t('git.toggleDiff')}>
           <span className="text-xs mac-input-mono truncate block" style={{ color: 'var(--text)' }}>
             {file.path}
           </span>
@@ -155,7 +158,7 @@ function FileRow({ file, mdxPath, section, onAction }: {
               className="text-[10px] px-2 py-0.5 disabled:opacity-40 transition-colors"
               style={{ color: 'var(--red)', background: 'color-mix(in srgb, var(--red) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--red) 30%, transparent)', borderRadius: 4 }}
             >
-              Discard
+              {t('git.discard')}
             </button>
           )}
           {section === 'staged' && (
@@ -164,7 +167,7 @@ function FileRow({ file, mdxPath, section, onAction }: {
               disabled={busy}
               className="mac-btn text-[10px] px-2 py-0.5 disabled:opacity-40"
             >
-              Unstage
+              {t('git.unstage')}
             </button>
           )}
           {section === 'unstaged' && (
@@ -173,7 +176,7 @@ function FileRow({ file, mdxPath, section, onAction }: {
               disabled={busy}
               className="mac-btn mac-btn-primary text-[10px] px-2 py-0.5 disabled:opacity-40"
             >
-              Stage
+              {t('git.stage')}
             </button>
           )}
           <button
@@ -189,7 +192,7 @@ function FileRow({ file, mdxPath, section, onAction }: {
       {expanded && (
         <div style={{ borderTop: '1px solid var(--border)' }}>
           {loadingDiff
-            ? <p className="text-[11px] px-3 py-2" style={{ color: 'var(--text-faint)' }}>Loading…</p>
+            ? <p className="text-[11px] px-3 py-2" style={{ color: 'var(--text-faint)' }}>{t('common.loading')}</p>
             : <DiffView diff={diff ?? ''} />}
         </div>
       )}
@@ -202,6 +205,7 @@ function FileRow({ file, mdxPath, section, onAction }: {
 // ── Commit row ────────────────────────────────────────────────────────────────
 
 function CommitRow({ commit, mdxPath }: { commit: GitCommit; mdxPath: string }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [show, setShow]         = useState<string | null>(null);
   const [loading, setLoading]   = useState(false);
@@ -243,7 +247,7 @@ function CommitRow({ commit, mdxPath }: { commit: GitCommit; mdxPath: string }) 
       {expanded && (
         <div style={{ borderTop: '1px solid var(--border)' }}>
           {loading
-            ? <p className="text-[11px] px-3 py-2" style={{ color: 'var(--text-faint)' }}>Loading…</p>
+            ? <p className="text-[11px] px-3 py-2" style={{ color: 'var(--text-faint)' }}>{t('common.loading')}</p>
             : <DiffView diff={show ?? ''} />}
         </div>
       )}
@@ -314,6 +318,7 @@ function SectionLabel({ label, count, color, action }: {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function GitPanel({ mdxPath }: { mdxPath: string }) {
+  const { t } = useTranslation();
   const [status, setStatus]       = useState<GitStatusData | null>(null);
   const [commits, setCommits]     = useState<GitCommit[]>([]);
   const [tab, setTab]             = useState<'changes' | 'log'>('changes');
@@ -382,7 +387,7 @@ export function GitPanel({ mdxPath }: { mdxPath: string }) {
   if (loading && !status) {
     return (
       <div className="flex items-center justify-center py-20">
-        <p className="text-sm" style={{ color: 'var(--text-faint)' }}>Loading…</p>
+        <p className="text-sm" style={{ color: 'var(--text-faint)' }}>{t('common.loading')}</p>
       </div>
     );
   }
@@ -391,11 +396,11 @@ export function GitPanel({ mdxPath }: { mdxPath: string }) {
   if (!status.is_repo) {
     return (
       <div className="text-center py-16 mac-fade-in">
-        <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text)' }}>Not a Git repository</p>
+        <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text)' }}>{t('git.notRepo')}</p>
         <p className="text-xs mb-5 max-w-xs mx-auto" style={{ color: 'var(--text-muted)' }}>
-          Initialize a repository to track changes and sync with a remote.
+          {t('git.notRepoHint')}
         </p>
-        <button onClick={handleInit} className="mac-btn mac-btn-primary">Initialize Repo</button>
+        <button onClick={handleInit} className="mac-btn mac-btn-primary">{t('git.initializeRepo')}</button>
       </div>
     );
   }
@@ -455,23 +460,23 @@ export function GitPanel({ mdxPath }: { mdxPath: string }) {
             onClick={handlePull}
             disabled={anyBusy || !status.remote}
             className="mac-btn text-[11px] disabled:opacity-40"
-            title={!status.remote ? 'No remote origin' : 'Pull'}
+            title={!status.remote ? t('git.noRemote') : t('git.pull')}
           >
-            {pullOp.running ? '…' : '↓ Pull'}
+            {pullOp.running ? '…' : `↓ ${t('git.pull')}`}
           </button>
           <button
             onClick={handlePush}
             disabled={anyBusy || !status.remote}
             className="mac-btn text-[11px] disabled:opacity-40"
-            title={!status.remote ? 'No remote origin' : 'Push'}
+            title={!status.remote ? t('git.noRemote') : t('git.push')}
           >
-            {pushOp.running ? '…' : '↑ Push'}
+            {pushOp.running ? '…' : `↑ ${t('git.push')}`}
           </button>
           <button
             onClick={refresh}
             disabled={loading}
             className="mac-btn text-[11px] disabled:opacity-40"
-            title="Refresh"
+            title={t('git.refresh')}
           >
             {loading ? '…' : '↺'}
           </button>
@@ -488,20 +493,20 @@ export function GitPanel({ mdxPath }: { mdxPath: string }) {
 
       {/* ── Tabs ── */}
       <div className="flex gap-0" style={{ borderBottom: '1px solid var(--border)' }}>
-        {(['changes', 'log'] as const).map(t => (
+        {(['changes', 'log'] as const).map(tabKey => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={tabKey}
+            onClick={() => setTab(tabKey)}
             className="px-4 py-2 text-xs font-medium capitalize transition-colors"
             style={
-              tab === t
+              tab === tabKey
                 ? { color: 'var(--accent)', borderBottom: '2px solid var(--accent)', background: 'transparent', marginBottom: -1 }
                 : { color: 'var(--text-muted)', borderBottom: '2px solid transparent', background: 'transparent', marginBottom: -1 }
             }
           >
-            {t === 'changes'
-              ? `Changes${status.files.length > 0 ? ` (${status.files.length})` : ''}`
-              : `Log${commits.length > 0 ? ` (${commits.length})` : ''}`}
+            {tabKey === 'changes'
+              ? `${t('git.changes')}${status.files.length > 0 ? ` (${status.files.length})` : ''}`
+              : `${t('git.log')}${commits.length > 0 ? ` (${commits.length})` : ''}`}
           </button>
         ))}
       </div>
@@ -515,14 +520,14 @@ export function GitPanel({ mdxPath }: { mdxPath: string }) {
               className="text-center py-10 border border-dashed"
               style={{ borderColor: 'var(--border-2)', borderRadius: 8 }}
             >
-              <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Working tree clean</p>
-              <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>No uncommitted changes</p>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{t('git.clean')}</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>{t('git.noChanges')}</p>
             </div>
           )}
 
           {staged.length > 0 && (
             <div>
-              <SectionLabel label="Staged" count={staged.length} color="var(--green)" />
+              <SectionLabel label={t('git.staged')} count={staged.length} color="var(--green)" />
               <div className="space-y-1">
                 {staged.map((f, i) => (
                   <FileRow key={i} file={f} mdxPath={mdxPath} section="staged" onAction={refresh} />
@@ -534,11 +539,11 @@ export function GitPanel({ mdxPath }: { mdxPath: string }) {
           {unstaged.length > 0 && (
             <div>
               <SectionLabel
-                label="Unstaged"
+                label={t('git.unstaged')}
                 count={unstaged.length}
                 action={
                   <button onClick={handleStageAll} className="mac-btn text-[10px] px-2 py-0.5">
-                    Stage all
+                    {t('git.stageAll')}
                   </button>
                 }
               />
@@ -564,7 +569,7 @@ export function GitPanel({ mdxPath }: { mdxPath: string }) {
                       runCommit(false);
                     }
                   }}
-                  placeholder="Commit message…"
+                  placeholder={t('git.commitPlaceholder')}
                   rows={3}
                   className="mac-input resize-none"
                   style={{ fontFamily: 'inherit', fontSize: '12px', background: 'var(--surface-2)' }}
@@ -574,23 +579,23 @@ export function GitPanel({ mdxPath }: { mdxPath: string }) {
                 className="flex items-center justify-between gap-2 px-3 py-2"
                 style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}
               >
-                <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>⌘↵ commits staged</span>
+                <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>{t('git.commitShortcut')}</span>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => runCommit(true)}
                     disabled={!commitMsg.trim() || commitOp.running}
                     className="mac-btn text-xs disabled:opacity-40"
-                    title="Stage all and commit"
+                    title={t('git.stageAllAndCommit')}
                   >
-                    {commitOp.running ? '…' : 'Stage all & commit'}
+                    {commitOp.running ? '…' : t('git.stageAllAndCommit')}
                   </button>
                   <button
                     onClick={() => runCommit(false)}
                     disabled={!commitMsg.trim() || commitOp.running || staged.length === 0}
                     className="mac-btn mac-btn-primary text-xs disabled:opacity-40"
-                    title={staged.length === 0 ? 'Stage files first' : undefined}
+                    title={staged.length === 0 ? t('git.stageFilesFirst') : undefined}
                   >
-                    {commitOp.running ? '…' : 'Commit staged'}
+                    {commitOp.running ? '…' : t('git.commitStaged')}
                   </button>
                 </div>
               </div>
@@ -611,7 +616,7 @@ export function GitPanel({ mdxPath }: { mdxPath: string }) {
               className="text-center py-10 border border-dashed"
               style={{ borderColor: 'var(--border-2)', borderRadius: 8 }}
             >
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No commits yet</p>
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('git.noCommits')}</p>
             </div>
           ) : (
             <div className="space-y-1">

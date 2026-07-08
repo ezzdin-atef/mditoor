@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface ConfirmDialogOptions {
   title: ReactNode;
@@ -20,6 +21,7 @@ function ConfirmDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const { t } = useTranslation();
   const titleId = useId();
   const messageId = useId();
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -61,7 +63,7 @@ function ConfirmDialog({
             onClick={onCancel}
             type="button"
           >
-            {options.cancelLabel ?? 'Cancel'}
+            {options.cancelLabel ?? t('common.cancel')}
           </button>
           <button
             className="mac-btn confirm-dialog-danger-btn"
@@ -77,17 +79,18 @@ function ConfirmDialog({
 }
 
 export function useConfirmDialog() {
+  const { t } = useTranslation();
   const [pending, setPending] = useState<PendingConfirmation | null>(null);
 
   const confirm = useCallback((options: ConfirmDialogOptions) => (
     new Promise<boolean>(resolve => {
       setPending({
-        cancelLabel: 'Cancel',
+        cancelLabel: t('common.cancel'),
         ...options,
         resolve,
       });
     })
-  ), []);
+  ), [t]);
 
   const cancel = useCallback(() => {
     setPending(current => {

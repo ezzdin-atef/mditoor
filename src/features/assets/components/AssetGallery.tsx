@@ -103,7 +103,7 @@ export function AssetGallery({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Scanning images...</p>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('images.scanning')}</p>
       </div>
     );
   }
@@ -112,7 +112,7 @@ export function AssetGallery({
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <p className="text-sm font-medium" style={{ color: 'var(--red)' }}>{error}</p>
-        <button onClick={refresh} className="mac-btn mt-3">Retry</button>
+        <button onClick={refresh} className="mac-btn mt-3">{t('common.retry')}</button>
       </div>
     );
   }
@@ -132,16 +132,16 @@ export function AssetGallery({
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="flex items-center gap-1.5 flex-1 flex-wrap">
           <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            {images.length} {images.length === 1 ? 'image' : 'images'}
+            {t('images.count', { count: images.length })}
           </span>
           {images.length > 0 && (
             <>
               <span className="text-xs" style={{ color: 'var(--text-faint)' }}>·</span>
-              <span className="text-xs" style={{ color: 'var(--green)' }}>{usedCount} used</span>
+              <span className="text-xs" style={{ color: 'var(--green)' }}>{t('images.usedCount', { count: usedCount })}</span>
               {unusedCount > 0 && (
                 <>
                   <span className="text-xs" style={{ color: 'var(--text-faint)' }}>·</span>
-                  <span className="text-xs" style={{ color: 'var(--orange)' }}>{unusedCount} unused</span>
+                  <span className="text-xs" style={{ color: 'var(--orange)' }}>{t('images.unusedCount', { count: unusedCount })}</span>
                 </>
               )}
             </>
@@ -156,26 +156,28 @@ export function AssetGallery({
                 onClick={() => setFilter(f)}
                 className={`mac-segment${filter === f ? ' active' : ''}`}
               >
-                {f.charAt(0).toUpperCase() + f.slice(1)}
+                {t(`images.filters.${f}`)}
               </button>
             ))}
           </div>
         )}
 
         <button onClick={handleAddImage} className="mac-btn mac-btn-primary text-xs">
-          + Add Image
+          {t('images.addImage')}
         </button>
-        <button onClick={refresh} className="mac-btn text-xs">Refresh</button>
+        <button onClick={refresh} className="mac-btn text-xs">{t('posts.refresh')}</button>
       </div>
 
       {visible.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center mac-fade-in">
           <p className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>
-            {images.length === 0 ? 'No images found' : `No ${filter} images`}
+            {images.length === 0
+              ? t('images.empty')
+              : t('images.emptyFiltered', { filter: t(`images.filters.${filter}`).toLowerCase() })}
           </p>
           {images.length === 0 && (
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Click "+ Add Image" to import an image into your workspace.
+              {t('images.emptyHint')}
             </p>
           )}
         </div>
@@ -199,7 +201,7 @@ export function AssetGallery({
 
       {!s3Ready && (
         <p className="text-[11px] mt-4" style={{ color: 'var(--text-faint)' }}>
-          Configure S3 credentials in the workspace Config tab to enable uploads.
+          {t('images.s3Hint')}
         </p>
       )}
 
@@ -227,6 +229,7 @@ function ImageCard({
   onUpload: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   const [src, setSrc]       = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -256,7 +259,7 @@ function ImageCard({
           color:      used ? 'var(--green)' : 'var(--text-faint)',
         }}
       >
-        {used ? 'used' : 'unused'}
+        {used ? t('images.used') : t('images.unused')}
       </div>
 
       {/* Thumbnail */}
@@ -294,7 +297,7 @@ function ImageCard({
             className="text-[11px] px-2.5 py-1 font-medium"
             style={{ background: 'var(--bg)', color: 'var(--text)', border: '1.5px solid var(--border-2)' }}
           >
-            {copied ? 'Copied!' : 'Copy MDX'}
+            {copied ? t('images.copied') : t('images.copyMdx')}
           </button>
           {showUpload && (
             <button
@@ -303,7 +306,7 @@ function ImageCard({
               className="text-[11px] px-2.5 py-1 font-medium disabled:opacity-50"
               style={{ background: 'var(--accent)', color: 'var(--on-fill)', border: 'none' }}
             >
-              {busy ? 'Uploading...' : 'Upload S3'}
+              {busy ? t('images.uploading') : t('images.uploadS3')}
             </button>
           )}
           <button
@@ -311,7 +314,7 @@ function ImageCard({
             className="text-[11px] px-2.5 py-1 font-medium"
             style={{ background: 'var(--red)', color: '#fff', border: 'none' }}
           >
-            Delete
+            {t('common.delete')}
           </button>
         </div>
       </div>
@@ -329,12 +332,12 @@ function ImageCard({
             style={{ color: 'var(--green)' }}
             title={result.url}
           >
-            Uploaded — copy URL
+            {t('images.uploadedCopyUrl')}
           </button>
         )}
         {result?.err && (
           <p className="text-[9px] mt-1 truncate" style={{ color: 'var(--red)' }} title={result.err}>
-            Failed
+            {t('images.failed')}
           </p>
         )}
       </div>

@@ -223,6 +223,19 @@ html {
   box-shadow: 0 8px 14px rgba(0,0,0,0.16), 0 1px 3px rgba(0,0,0,0.12);
 }
 
+[dir="rtl"] .confirm-dialog {
+  grid-template-columns: 1fr 32px;
+}
+
+[dir="rtl"] .confirm-dialog-icon {
+  grid-column: 2;
+}
+
+[dir="rtl"] .confirm-dialog-copy {
+  grid-column: 1;
+  grid-row: 1;
+}
+
 .confirm-dialog-icon {
   width: 28px;
   height: 28px;

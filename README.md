@@ -1,6 +1,6 @@
 # Mditoor
 
-> A desktop content studio for MDX, Next.js, and file-based websites with supporting of both RTL and LTR Langs.
+> A desktop content studio for MDX, Next.js, and file-based websites — with full RTL and LTR support.
 
 Mditoor is a local-first desktop application built with Tauri, React, and Rust that makes editing MDX content easy while keeping your files inside your own repository.
 
@@ -8,29 +8,26 @@ Mditoor is a local-first desktop application built with Tauri, React, and Rust t
 
 ## Features
 
-- Rich MDX editor
-- Dynamic metadata forms
-- Schema-based content models
-- Image management
-- S3 uploads
-- Asset gallery
-- Next.js preview
-- MDX component support
-- Git integration
-- SEO tools
-- Local-first architecture
+- Block-based and raw Markdown editor
+- Dynamic metadata forms with schema-based field types
+- Git integration (stage, commit, push, pull, diff view)
+- Image management and S3 upload support
+- Asset gallery with used/unused tracking
+- SEO analysis panel
+- RTL / LTR auto-detection per block
+- Local-first — no accounts, no cloud sync
 
 ---
 
 ## Why Mditoor?
 
-Writing MDX content today usually requires:
+Writing MDX content today usually requires switching between:
 
-- VSCode
-- File explorer
-- Frontmatter editing
+- A code editor
+- A file explorer
+- Frontmatter editing by hand
 - Manual image uploads
-- S3 management
+- S3 tooling
 - Git commands
 
 Mditoor brings all of these into a single desktop application.
@@ -39,24 +36,15 @@ Mditoor brings all of these into a single desktop application.
 
 ## Philosophy
 
-- Local first
-- Git friendly
-- File based
-- Framework aware
-- Developer focused
-
-Your content always remains:
-
-- Markdown files
-- MDX files
-- Images
-- Git repositories
-
-Mditoor never locks your content into a proprietary format.
+- **Local first** — your files stay in your repo
+- **Git friendly** — built-in staging, commits, and remote sync
+- **File based** — plain `.mdx` files, no proprietary format
+- **Framework aware** — designed around Next.js MDX conventions
+- **Developer focused** — workspace config lives next to your content
 
 ---
 
-# Supported Platforms
+## Supported Platforms
 
 - Windows
 - macOS (Soon)
@@ -64,7 +52,7 @@ Mditoor never locks your content into a proprietary format.
 
 ---
 
-# Supported Frameworks
+## Supported Frameworks
 
 Current:
 
@@ -73,131 +61,131 @@ Current:
 Planned:
 
 - Astro
-- NuxtJS
+- Nuxt
 - Docusaurus
 
 ---
 
-# Example Workspace
+## Workspace Structure
+
+Point a workspace at your posts folder. Mditoor creates a `.mditoor.json` config file alongside your content:
 
 ```text
-my-blog/
-├── .editoorconfig/
-│   ├── schema.json
-│   └── taxonomies.json
-│
-├── content/
-│   └── posts/
-│       └── my-post/
-│           ├── index.mdx
-│           └── images/
+content/posts/           ← your posts folder (set as workspace path)
+├── .mditoor.json        ← workspace config (auto-created)
+├── my-first-post/
+│   └── index.mdx
+└── another-post/
+    └── index.mdx
 ```
 
 ---
 
-# Metadata Schema
+## Metadata Schema
+
+Define frontmatter fields per workspace. Supported field types: `text`, `select`, `date`, `tags`, `boolean`, `image`, `number`.
 
 ```json
 {
   "fields": [
-    {
-      "key": "title",
-      "label": "Title",
-      "type": "text",
-      "required": true
-    },
-    {
-      "key": "category",
-      "type": "select"
-    },
-    {
-      "key": "tags",
-      "type": "multiselect"
-    }
+    { "name": "title",    "type": "text",    "required": true },
+    { "name": "date",     "type": "date",    "required": true },
+    { "name": "status",   "type": "select",  "options": ["draft", "published"] },
+    { "name": "tags",     "type": "tags" },
+    { "name": "featured", "type": "boolean" }
   ]
 }
 ```
 
 ---
 
-# Tech Stack
+## Tech Stack
 
-## Desktop
-
-- Tauri v2
-- Rust
-
-## Frontend
-
-- React
-- TypeScript
-- Vite
-
-## UI
-
-- Tailwind CSS
-
-## State
-
-- Zustand
-- TanStack Query
-
-## Editor
-
-- MDXEditor
+| Layer     | Technology                         |
+|-----------|------------------------------------|
+| Desktop   | Tauri v2, Rust                     |
+| Frontend  | React 19, TypeScript, Vite         |
+| UI        | Tailwind CSS v4                    |
+| State     | Zustand, TanStack Query            |
+| i18n      | i18next (English, Arabic, French)  |
 
 ---
 
-# Development
+## Development
 
-## Install Dependencies
+### Install dependencies
 
 ```bash
 npm install
 ```
 
-## Run Frontend
+### Run in development mode
 
 ```bash
-npm dev
+npm run tauri dev
 ```
 
-## Run Tauri
+### Build for production
 
 ```bash
-npm tauri dev
+npm run tauri build
 ```
 
-## Build Application
+### Build a local Windows installer (.exe)
+
+**Prerequisites**
+
+- [Node.js](https://nodejs.org) 18+
+- [Rust](https://rustup.rs) (stable toolchain)
+- [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (required by Tauri on Windows)
+
+**Steps**
 
 ```bash
-npm tauri build
+# 1. Install dependencies
+npm install
+
+# 2. Build
+npm run tauri build
+```
+
+The installer is created at:
+
+```
+src-tauri/target/release/bundle/nsis/Mditoor_<version>_x64-setup.exe
+```
+
+Run that file to install the app on any Windows machine.
+
+> **Tip:** The first build takes several minutes because Rust compiles from scratch.
+> Subsequent builds are faster thanks to incremental compilation.
+
+### Frontend only (without Tauri window)
+
+```bash
+npm run dev
+```
+
+### Regenerate app icons
+
+After editing `src-tauri/icons/icon-source.svg` (must be at least 1024×1024):
+
+```bash
+npm run tauri -- icon src-tauri/icons/icon-source.svg
 ```
 
 ---
 
-# Contributing
+## Contributing
 
-Contributions are welcome.
-
-Please open an issue before submitting large changes.
+Contributions are welcome. Please open an issue before submitting large changes.
 
 ---
 
-# Vision
-
-Mditoor aims to become:
-
-> The content workspace for developers.
-
-A place where developers can write, manage, preview, and publish content while keeping everything inside their own repositories.
-
----
-
-# License
+## License
 
 MIT
 
 ---
 
-Built with ❤️ using React, Rust, and Tauri.
+Built with React, Rust, and Tauri.

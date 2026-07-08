@@ -74,119 +74,105 @@ export function StorageConfigTab({
   const inputCls = 'mac-input mac-input-mono w-full';
 
   return (
-    <div className="max-w-lg space-y-6">
-      <div>
+    <div className="space-y-5">
+
+      {/* Status line */}
+      <div className="flex items-center gap-2">
         <div
-          className="mb-5 px-3 py-3"
-          style={{ border: '1px solid var(--border)', background: 'var(--surface)', borderRadius: 6 }}
-        >
-          <p className="text-xs font-medium mb-1" style={{ color: 'var(--text)' }}>
-            {t('storage.whereStored')}
-          </p>
-          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-            {t('storage.inS3')}. {t('storage.noThirdParty')}
-          </p>
-          {mdxPath && (
-            <p className="text-[11px] mt-2 mac-input-mono break-all" style={{ color: 'var(--text-faint)' }}>
-              {t('storage.configStoredAt', { path: `${mdxPath}\\.mditoor.json` })}
-            </p>
-          )}
-          <p className="text-[11px] mt-2 mac-input-mono" style={{ color: 'var(--text-faint)' }}>
-            {cfg.s3.bucket
-              ? `${cfg.s3.bucket}/${cfg.s3.keyPrefix || ''}`
-              : t('storage.notConfiguredHint')}
-          </p>
-        </div>
-
-        <div className="space-y-4">
-          <Field
-            label={t('storage.endpoint')}
-            hint={t('storage.endpointHint')}
+          className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+          style={{ background: cfg.s3.bucket ? 'var(--green)' : 'var(--surface-3)' }}
+        />
+        <span className="text-[11px] mac-input-mono truncate" style={{ color: 'var(--text-faint)' }}>
+          {cfg.s3.bucket
+            ? `${cfg.s3.bucket}/${cfg.s3.keyPrefix || ''}`
+            : t('storage.notConfigured')}
+        </span>
+        {mdxPath && (
+          <span
+            className="text-[10px] mac-input-mono truncate"
+            style={{ color: 'var(--text-faint)', marginInlineStart: 'auto', flexShrink: 0 }}
           >
-            <input
-              type="text"
-              value={cfg.s3.endpoint}
-              onChange={e => setS3('endpoint', e.target.value)}
-              placeholder="https://..."
-              className={inputCls}
-            />
-          </Field>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field label={t('storage.bucket')}>
-              <input
-                type="text"
-                value={cfg.s3.bucket}
-                onChange={e => setS3('bucket', e.target.value)}
-                placeholder="my-bucket"
-                className={inputCls}
-              />
-            </Field>
-            <Field label={t('storage.region')}>
-              <input
-                type="text"
-                value={cfg.s3.region}
-                onChange={e => setS3('region', e.target.value)}
-                placeholder="us-east-1"
-                className={inputCls}
-              />
-            </Field>
-          </div>
-
-          <Field label={t('storage.accessKey')}>
-            <input
-              type="text"
-              value={cfg.s3.accessKey}
-              onChange={e => setS3('accessKey', e.target.value)}
-              placeholder="AKIA..."
-              className={inputCls}
-            />
-          </Field>
-
-          <Field label={t('storage.secretKey')}>
-            <input
-              type="password"
-              value={secretDraft}
-              onChange={e => setSecretDraft(e.target.value)}
-              onContextMenu={e => e.preventDefault()}
-              placeholder={hasStoredSecret ? t('storage.secretKeyStoredPlaceholder') : '••••••••'}
-              className={inputCls}
-              autoComplete="new-password"
-            />
-            <p className="text-[11px]" style={{ color: 'var(--text-faint)' }}>
-              {t('storage.secretKeyHiddenHint')}
-            </p>
-          </Field>
-
-          <Field
-            label={t('storage.keyPrefix')}
-            hint={t('storage.keyPrefixHint')}
-          >
-            <input
-              type="text"
-              value={cfg.s3.keyPrefix}
-              onChange={e => setS3('keyPrefix', e.target.value)}
-              placeholder="images/"
-              className={inputCls}
-            />
-          </Field>
-
-          <Field
-            label={t('storage.publicUrl')}
-            hint={t('storage.publicUrlHint')}
-          >
-            <input
-              type="text"
-              value={cfg.s3.publicUrlPrefix}
-              onChange={e => setS3('publicUrlPrefix', e.target.value)}
-              placeholder="https://cdn.example.com"
-              className={inputCls}
-            />
-          </Field>
-        </div>
+            .mditoor.json
+          </span>
+        )}
       </div>
 
-      <div className="flex items-center gap-3 pt-2">
+      <div className="space-y-4">
+        <Field label={t('storage.endpoint')} hint={t('storage.endpointHint')}>
+          <input
+            type="text"
+            value={cfg.s3.endpoint}
+            onChange={e => setS3('endpoint', e.target.value)}
+            placeholder="https://..."
+            className={inputCls}
+          />
+        </Field>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={t('storage.bucket')}>
+            <input
+              type="text"
+              value={cfg.s3.bucket}
+              onChange={e => setS3('bucket', e.target.value)}
+              placeholder="my-bucket"
+              className={inputCls}
+            />
+          </Field>
+          <Field label={t('storage.region')}>
+            <input
+              type="text"
+              value={cfg.s3.region}
+              onChange={e => setS3('region', e.target.value)}
+              placeholder="us-east-1"
+              className={inputCls}
+            />
+          </Field>
+        </div>
+
+        <Field label={t('storage.accessKey')}>
+          <input
+            type="text"
+            value={cfg.s3.accessKey}
+            onChange={e => setS3('accessKey', e.target.value)}
+            placeholder="AKIA..."
+            className={inputCls}
+          />
+        </Field>
+
+        <Field label={t('storage.secretKey')} hint={t('storage.secretKeyHiddenHint')}>
+          <input
+            type="password"
+            value={secretDraft}
+            onChange={e => setSecretDraft(e.target.value)}
+            onContextMenu={e => e.preventDefault()}
+            placeholder={hasStoredSecret ? t('storage.secretKeyStoredPlaceholder') : '••••••••'}
+            className={inputCls}
+            autoComplete="new-password"
+          />
+        </Field>
+
+        <Field label={t('storage.keyPrefix')} hint={t('storage.keyPrefixHint')}>
+          <input
+            type="text"
+            value={cfg.s3.keyPrefix}
+            onChange={e => setS3('keyPrefix', e.target.value)}
+            placeholder="images/"
+            className={inputCls}
+          />
+        </Field>
+
+        <Field label={t('storage.publicUrl')} hint={t('storage.publicUrlHint')}>
+          <input
+            type="text"
+            value={cfg.s3.publicUrlPrefix}
+            onChange={e => setS3('publicUrlPrefix', e.target.value)}
+            placeholder="https://cdn.example.com"
+            className={inputCls}
+          />
+        </Field>
+      </div>
+
+      <div className="flex items-center gap-3 pt-1">
         <button onClick={handleSave} className="mac-btn mac-btn-primary">
           {t('storage.save')}
         </button>

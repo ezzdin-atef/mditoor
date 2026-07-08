@@ -229,12 +229,73 @@
     "configStoredAt": "Fichier de config : {{path}}"
   },
   "git": {
-    "panel": "Git"
+    "panel": "Git",
+    "notRepo": "Ce dossier n'est pas un dépôt Git",
+    "notRepoHint": "Initialisez un dépôt pour suivre les changements et synchroniser avec un remote.",
+    "initializeRepo": "Initialiser le dépôt",
+    "noRemote": "Aucun remote origin",
+    "pull": "Pull",
+    "push": "Push",
+    "refresh": "Actualiser",
+    "changes": "Changements",
+    "log": "Journal",
+    "clean": "Arbre de travail propre",
+    "noChanges": "Aucun changement non commité",
+    "staged": "Indexés",
+    "unstaged": "Non indexés",
+    "stage": "Indexer",
+    "unstage": "Désindexer",
+    "stageAll": "Tout indexer",
+    "discard": "Annuler",
+    "discardTitle": "Annuler les changements ?",
+    "discardConfirm": "Annuler les changements dans « {{path}} » ? Cette action est irréversible.",
+    "toggleDiff": "Afficher ou masquer le diff",
+    "noDiff": "Aucun diff disponible (nouveau fichier non suivi)",
+    "commitPlaceholder": "Message de commit…",
+    "commitShortcut": "⌘↵ commite les fichiers indexés",
+    "stageAllAndCommit": "Tout indexer et commiter",
+    "commitStaged": "Commiter l'index",
+    "stageFilesFirst": "Indexez d'abord des fichiers",
+    "noCommits": "Aucun commit",
+    "status": {
+      "modified": "modifié",
+      "added": "ajouté",
+      "deleted": "supprimé",
+      "renamed": "renommé",
+      "copied": "copié",
+      "conflict": "conflit",
+      "untracked": "non suivi"
+    }
   },
   "images": {
     "panel": "Images",
     "deleteTitle": "Supprimer l'image ?",
-    "deleteConfirm": "Supprimer « {{name}} » de cet espace de travail ? Cette action est irréversible."
+    "deleteConfirm": "Supprimer « {{name}} » de cet espace de travail ? Cette action est irréversible.",
+    "scanning": "Analyse des images…",
+    "count_one": "{{count}} image",
+    "count_other": "{{count}} images",
+    "usedCount_one": "{{count}} utilisée",
+    "usedCount_other": "{{count}} utilisées",
+    "unusedCount_one": "{{count}} inutilisée",
+    "unusedCount_other": "{{count}} inutilisées",
+    "filters": {
+      "all": "Toutes",
+      "used": "Utilisées",
+      "unused": "Inutilisées"
+    },
+    "addImage": "+ Ajouter une image",
+    "empty": "Aucune image trouvée",
+    "emptyFiltered": "Aucune image {{filter}}",
+    "emptyHint": "Cliquez sur « + Ajouter une image » pour importer une image dans cet espace.",
+    "s3Hint": "Configurez les identifiants S3 dans l'onglet Config pour activer les uploads.",
+    "used": "utilisée",
+    "unused": "inutilisée",
+    "copyMdx": "Copier MDX",
+    "copied": "Copié !",
+    "uploading": "Upload…",
+    "uploadS3": "Upload S3",
+    "uploadedCopyUrl": "Upload terminé - copier l'URL",
+    "failed": "Échec"
   },
   "common": {
     "loading": "Chargement…",
@@ -246,6 +307,7 @@
     "add": "Ajouter",
     "remove": "Retirer",
     "edit": "Modifier",
-    "confirm": "Confirmer"
+    "confirm": "Confirmer",
+    "retry": "Réessayer"
   }
 }

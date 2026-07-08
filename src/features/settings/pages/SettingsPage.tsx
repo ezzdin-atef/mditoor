@@ -31,13 +31,15 @@ function snapshotSettings(settings: Settings): Settings {
 }
 
 function sameSettings(a: Settings, b: Settings) {
-  return a.theme === b.theme &&
+  return (
+    a.theme === b.theme &&
     a.editorFont === b.editorFont &&
     a.editorFontSize === b.editorFontSize &&
     a.editorLineHeight === b.editorLineHeight &&
     a.language === b.language &&
     a.autoSave === b.autoSave &&
-    a.autoSaveInterval === b.autoSaveInterval;
+    a.autoSaveInterval === b.autoSaveInterval
+  );
 }
 
 function IconArrowLeft() {
@@ -79,7 +81,7 @@ export function SettingsPage() {
     if (!isDirty) setDraft(persisted);
   }, [isDirty, persisted]);
 
-  const setDraftValue = <K extends keyof Settings>(key: K, value: Settings[K]) => {
+  const set = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setDraft(prev => ({ ...prev, [key]: value }));
     setSavedFlash(false);
   };
@@ -87,9 +89,7 @@ export function SettingsPage() {
   const save = () => {
     if (!isDirty) return;
     (Object.keys(draft) as (keyof Settings)[]).forEach(key => {
-      if (draft[key] !== persisted[key]) {
-        settings.update(key, draft[key]);
-      }
+      if (draft[key] !== persisted[key]) settings.update(key, draft[key]);
     });
     setSavedFlash(true);
     window.setTimeout(() => setSavedFlash(false), 1800);
@@ -142,8 +142,8 @@ export function SettingsPage() {
   return (
     <div className="h-screen flex flex-col" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
       <header
-        className="sticky top-0 z-30 flex items-center gap-3 px-5 border-b flex-shrink-0"
-        style={{ minHeight: 56, background: 'var(--bg)', borderColor: 'var(--border)' }}
+        className="sticky top-0 z-30 flex items-center gap-3 px-5 flex-shrink-0"
+        style={{ minHeight: 52, background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}
       >
         <button
           onClick={() => navigate({ page: 'workspace' })}
@@ -153,15 +153,11 @@ export function SettingsPage() {
           <IconArrowLeft />
           {t('nav.back')}
         </button>
-        <div className="w-px h-5 flex-shrink-0" style={{ background: 'var(--border)' }} />
-        <div className="min-w-0 flex-1">
-          <h1 className="text-[15px] font-semibold truncate" style={{ color: 'var(--text)' }}>
-            {t('settings.title')}
-          </h1>
-          <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
-            {t('settings.subtitle')}
-          </p>
-        </div>
+
+        <h1 className="text-sm font-semibold flex-1 min-w-0 truncate" style={{ color: 'var(--text)' }}>
+          {t('settings.title')}
+        </h1>
+
         <div className="flex items-center gap-3 flex-shrink-0">
           <span
             className="hidden sm:inline-flex items-center gap-1.5 text-xs"
@@ -170,125 +166,78 @@ export function SettingsPage() {
             {!isDirty && savedFlash && <IconCheck />}
             {isDirty ? t('settings.unsavedChanges') : savedFlash ? t('settings.saved') : t('settings.upToDate')}
           </span>
-          <button
-            onClick={save}
-            disabled={!isDirty}
-            className="mac-btn mac-btn-primary"
-          >
+          <button onClick={save} disabled={!isDirty} className="mac-btn mac-btn-primary">
             {t('settings.saveChanges')}
           </button>
         </div>
       </header>
 
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-5 py-7 space-y-5">
-          <Section title={t('settings.language')} description={t('settings.languageHint')}>
-            <Row label={t('settings.language')}>
-              <SettingsSelect
-                options={LANGUAGES}
-                value={draft.language}
-                onChange={v => setDraftValue('language', v)}
-              />
-            </Row>
-          </Section>
+        <div className="max-w-2xl mx-auto px-5 py-8 space-y-4">
 
-          <Section title={t('settings.appearance')} description={t('settings.colorSchemeHint')}>
+          <Section title={t('settings.appearance')}>
             <Row label={t('settings.colorScheme')}>
-              <SegmentGroup
-                options={THEMES}
-                value={draft.theme}
-                onChange={v => setDraftValue('theme', v)}
-              />
+              <SegmentGroup options={THEMES} value={draft.theme} onChange={v => set('theme', v)} />
+            </Row>
+            <Row label={t('settings.language')}>
+              <SettingsSelect options={LANGUAGES} value={draft.language} onChange={v => set('language', v)} />
             </Row>
           </Section>
 
-          <Section title={t('settings.autoSave')} description={t('settings.autoSaveHint')}>
-            <Row label={t('settings.autoSave')}>
-              <Toggle
-                checked={draft.autoSave}
-                onChange={() => setDraftValue('autoSave', !draft.autoSave)}
-              />
-            </Row>
-
-            {draft.autoSave && (
-              <Row label={t('settings.autoSaveInterval')} hint={t('settings.autoSaveIntervalHint')}>
-                <SettingsSelect
-                  options={INTERVALS}
-                  value={draft.autoSaveInterval}
-                  onChange={v => setDraftValue('autoSaveInterval', v)}
-                />
-              </Row>
-            )}
-          </Section>
-
-          <Section title={t('settings.editor')} description={t('settings.fontFamilyHint')}>
+          <Section title={t('settings.editor')}>
             <Row label={t('settings.fontFamily')}>
-              <SettingsSelect
-                options={FONTS}
-                value={draft.editorFont}
-                onChange={v => setDraftValue('editorFont', v)}
-              />
+              <SettingsSelect options={FONTS} value={draft.editorFont} onChange={v => set('editorFont', v)} />
             </Row>
-
             <Row label={t('settings.fontSize')}>
-              <SettingsSelect
-                options={SIZES}
-                value={draft.editorFontSize}
-                onChange={v => setDraftValue('editorFontSize', v)}
-              />
+              <SegmentGroup options={SIZES} value={draft.editorFontSize} onChange={v => set('editorFontSize', v)} />
             </Row>
-
             <Row label={t('settings.lineHeight')}>
-              <SettingsSelect
-                options={LINE_HEIGHTS}
-                value={draft.editorLineHeight}
-                onChange={v => setDraftValue('editorLineHeight', v)}
-              />
+              <SegmentGroup options={LINE_HEIGHTS} value={draft.editorLineHeight} onChange={v => set('editorLineHeight', v)} />
             </Row>
-
+            <Row label={t('settings.autoSave')}>
+              <div className="flex items-center gap-3">
+                {draft.autoSave && (
+                  <SettingsSelect
+                    options={INTERVALS}
+                    value={draft.autoSaveInterval}
+                    onChange={v => set('autoSaveInterval', v)}
+                  />
+                )}
+                <Toggle checked={draft.autoSave} onChange={() => set('autoSave', !draft.autoSave)} />
+              </div>
+            </Row>
             <EditorPreview draft={draft} label={t('settings.preview')} />
           </Section>
+
         </div>
       </main>
     </div>
   );
 }
 
-function Section({ title, description, children }: {
-  title: string;
-  description?: string;
-  children: ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section
-      style={{
-        border: '1px solid var(--border)',
-        borderRadius: 8,
-        background: 'var(--bg)',
-        overflow: 'hidden',
-      }}
+      style={{ border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', overflow: 'hidden' }}
     >
-      <div className="px-4 py-3" style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
-        <h2 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{title}</h2>
-        {description && (
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{description}</p>
-        )}
+      <div
+        className="px-4 py-2.5"
+        style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}
+      >
+        <h2 className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{title}</h2>
       </div>
       <div>{children}</div>
     </section>
   );
 }
 
-function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div
       className="px-4 py-3 border-b last:border-b-0 flex items-center justify-between gap-4"
       style={{ borderColor: 'var(--border)' }}
     >
-      <div className="min-w-0">
-        <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{label}</p>
-        {hint && <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{hint}</p>}
-      </div>
+      <p className="text-sm" style={{ color: 'var(--text)' }}>{label}</p>
       <div className="flex-shrink-0">{children}</div>
     </div>
   );

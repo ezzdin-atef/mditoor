@@ -1028,7 +1028,12 @@ export function BlockEditor({ value, onChange, editorStyle, onInsertImage }: Pro
         const enterEditMode = () => {
           setFocusedId(b.id);
           window.setTimeout(() => {
-            document.querySelector<HTMLTextAreaElement>(`[data-block-input="${b.id}"]`)?.focus();
+            const el = document.querySelector<HTMLTextAreaElement>(`[data-block-input="${b.id}"]`);
+            if (!el) return;
+            el.focus();
+            const len = el.value.length;
+            el.selectionStart = len;
+            el.selectionEnd = len;
           }, 0);
         };
         return (

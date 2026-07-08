@@ -229,12 +229,73 @@
     "configStoredAt": "Config file: {{path}}"
   },
   "git": {
-    "panel": "Git"
+    "panel": "Git",
+    "notRepo": "Not a Git repository",
+    "notRepoHint": "Initialize a repository to track changes and sync with a remote.",
+    "initializeRepo": "Initialize Repo",
+    "noRemote": "No remote origin",
+    "pull": "Pull",
+    "push": "Push",
+    "refresh": "Refresh",
+    "changes": "Changes",
+    "log": "Log",
+    "clean": "Working tree clean",
+    "noChanges": "No uncommitted changes",
+    "staged": "Staged",
+    "unstaged": "Unstaged",
+    "stage": "Stage",
+    "unstage": "Unstage",
+    "stageAll": "Stage all",
+    "discard": "Discard",
+    "discardTitle": "Discard changes?",
+    "discardConfirm": "Discard changes to \"{{path}}\"? This cannot be undone.",
+    "toggleDiff": "Toggle diff",
+    "noDiff": "No diff available (new untracked file)",
+    "commitPlaceholder": "Commit message…",
+    "commitShortcut": "⌘↵ commits staged",
+    "stageAllAndCommit": "Stage all & commit",
+    "commitStaged": "Commit staged",
+    "stageFilesFirst": "Stage files first",
+    "noCommits": "No commits yet",
+    "status": {
+      "modified": "modified",
+      "added": "added",
+      "deleted": "deleted",
+      "renamed": "renamed",
+      "copied": "copied",
+      "conflict": "conflict",
+      "untracked": "untracked"
+    }
   },
   "images": {
     "panel": "Images",
     "deleteTitle": "Delete image?",
-    "deleteConfirm": "Delete \"{{name}}\" from this workspace? This cannot be undone."
+    "deleteConfirm": "Delete \"{{name}}\" from this workspace? This cannot be undone.",
+    "scanning": "Scanning images…",
+    "count_one": "{{count}} image",
+    "count_other": "{{count}} images",
+    "usedCount_one": "{{count}} used",
+    "usedCount_other": "{{count}} used",
+    "unusedCount_one": "{{count}} unused",
+    "unusedCount_other": "{{count}} unused",
+    "filters": {
+      "all": "All",
+      "used": "Used",
+      "unused": "Unused"
+    },
+    "addImage": "+ Add Image",
+    "empty": "No images found",
+    "emptyFiltered": "No {{filter}} images",
+    "emptyHint": "Click \"+ Add Image\" to import an image into your workspace.",
+    "s3Hint": "Configure S3 credentials in the workspace Config tab to enable uploads.",
+    "used": "used",
+    "unused": "unused",
+    "copyMdx": "Copy MDX",
+    "copied": "Copied!",
+    "uploading": "Uploading…",
+    "uploadS3": "Upload S3",
+    "uploadedCopyUrl": "Uploaded - copy URL",
+    "failed": "Failed"
   },
   "common": {
     "loading": "Loading…",
@@ -246,6 +307,7 @@
     "add": "Add",
     "remove": "Remove",
     "edit": "Edit",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "retry": "Retry"
   }
 }
