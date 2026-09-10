@@ -160,6 +160,24 @@ Run that file to install the app on any Windows machine.
 > **Tip:** The first build takes several minutes because Rust compiles from scratch.
 > Subsequent builds are faster thanks to incremental compilation.
 
+### Publish a GitHub release
+
+1. Push the commit you want to release.
+2. In GitHub, create and publish a release with a tag in the form `vMAJOR.MINOR.PATCH`,
+   such as `v1.2.3`.
+3. The **Release Windows app** workflow builds the tagged revision and attaches a
+   production Windows installer to the release.
+
+The release tag is the source of truth for the packaged app version. For example,
+release `v1.2.3` produces:
+
+```text
+Mditoor-Setup-1.2.3-Windows-x64.exe
+```
+
+The downloaded file is the Windows installer; the application it installs also has
+version `1.2.3` in its executable metadata.
+
 ### Frontend only (without Tauri window)
 
 ```bash

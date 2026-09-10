@@ -1,9 +1,8 @@
-name: Release
+name: Release Windows app
 
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]
 
 jobs:
   release:
@@ -13,7 +12,24 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out the released revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Read and validate release version
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v(?<version>(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*))$') {
+            throw "Release tag '$env:RELEASE_TAG' must use the format vMAJOR.MINOR.PATCH (for example, v1.2.3)."
+          }
+
+          $version = $Matches.version
+          @{ version = $version } |
+            ConvertTo-Json |
+            Set-Content -Encoding utf8 src-tauri/tauri.release.conf.json
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -32,11 +48,11 @@ jobs:
         run: npm install
 
       - name: Build and publish release
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Mditoor ${{ github.ref_name }}'
-          releaseDraft: false
-          prerelease: false
+          releaseId: ${{ github.event.release.id }}
+          tagName: ${{ github.event.release.tag_name }}
+          args: --bundles nsis --config src-tauri/tauri.release.conf.json
+          releaseAssetNamePattern: Mditoor-Setup-[version]-Windows-[arch][ext]

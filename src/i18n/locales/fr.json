@@ -95,6 +95,7 @@
     "subtitle": "Schéma Frontmatter pour les posts de cet espace",
     "addField": "+ Ajouter un champ",
     "addFirst": "+ Ajouter le premier champ",
+    "dragToReorder": "Glisser pour réorganiser",
     "noFields": "Aucun champ défini",
     "noFieldsHint": "Ajoutez des champs pour définir la structure Frontmatter des posts.",
     "newField": "Nouveau champ",

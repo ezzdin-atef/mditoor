@@ -95,6 +95,7 @@
     "subtitle": "مخطط الـ Frontmatter للمشاركات في هذه المساحة",
     "addField": "+ إضافة حقل",
     "addFirst": "+ إضافة أول حقل",
+    "dragToReorder": "اسحب لإعادة الترتيب",
     "noFields": "لا توجد حقول محددة",
     "noFieldsHint": "أضف حقولاً لتحديد هيكل الـ Frontmatter للمشاركات.",
     "newField": "حقل جديد",

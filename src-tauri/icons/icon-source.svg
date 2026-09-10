@@ -1,29 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#1E3566"/>
-      <stop offset="100%" stop-color="#091A3A"/>
-    </linearGradient>
-    <linearGradient id="mg" x1="230" y1="216" x2="794" y2="814" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#FFFFFF"/>
-      <stop offset="100%" stop-color="#C8D8FF"/>
+      <stop offset="0%" stop-color="#050505"/>
+      <stop offset="100%" stop-color="#2C2C2E"/>
     </linearGradient>
   </defs>
 
   <!-- Rounded box background -->
-  <rect width="1024" height="1024" rx="224" ry="224" fill="url(#bg)"/>
+  <rect width="1024" height="1024" rx="225" ry="225" fill="url(#bg)"/>
 
-  <!-- M letter — ~180px padding from each edge -->
-  <polyline
-    points="230,814 230,216 512,542 794,216 794,814"
-    fill="none"
-    stroke="url(#mg)"
-    stroke-width="89"
-    stroke-linejoin="miter"
-    stroke-linecap="butt"
-    stroke-miterlimit="20"
-  />
-
-  <!-- Accent dot below M centre -->
-  <circle cx="512" cy="876" r="18" fill="rgba(100,160,255,0.55)"/>
+  <!-- Markdown "#" mark -->
+  <g stroke="#FFFFFF" stroke-width="72" stroke-linecap="round" fill="none">
+    <line x1="350" y1="230" x2="350" y2="794"/>
+    <line x1="674" y1="230" x2="674" y2="794"/>
+    <line x1="230" y1="350" x2="794" y2="350"/>
+    <line x1="230" y1="674" x2="794" y2="674"/>
+  </g>
 </svg>

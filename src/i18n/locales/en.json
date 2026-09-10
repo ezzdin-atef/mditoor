@@ -95,6 +95,7 @@
     "subtitle": "Frontmatter schema for posts in this workspace",
     "addField": "+ Add Field",
     "addFirst": "+ Add First Field",
+    "dragToReorder": "Drag to reorder",
     "noFields": "No fields defined",
     "noFieldsHint": "Add fields to define the frontmatter structure for posts.",
     "newField": "New Field",

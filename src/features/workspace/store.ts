@@ -70,6 +70,7 @@ interface Store {
   addField: (workspaceId: string, field: Omit<MetadataField, 'id'>) => Promise<void>;
   updateField: (workspaceId: string, fieldId: string, updates: Partial<Omit<MetadataField, 'id'>>) => Promise<void>;
   deleteField: (workspaceId: string, fieldId: string) => Promise<void>;
+  reorderFields: (workspaceId: string, orderedFieldIds: string[]) => Promise<void>;
   updateStorage: (workspaceId: string, storage: StorageConfig) => Promise<void>;
 }
 
@@ -84,7 +85,10 @@ export const useStore = create<Store>((set, get) => ({
     localStorage.setItem(LS_KEY, JSON.stringify(stored));
     const currentId = get().activeId;
     const activeId  = workspaces.some(w => w.id === currentId) ? currentId : (workspaces[0]?.id ?? null);
-    set({ workspaces, activeId });
+    set({ workspaces });
+    // withWorkspaceDefaults always resets metadataFields to []; setActive re-reads
+    // the per-workspace .mditoor.json so the restored workspace's fields aren't lost.
+    void get().setActive(activeId);
   },
 
   addWorkspace: async (name, mdxPath) => {
@@ -177,6 +181,18 @@ export const useStore = create<Store>((set, get) => ({
         ? { ...w, metadataFields: w.metadataFields.filter(f => f.id !== fieldId) }
         : w,
     );
+    set({ workspaces });
+    const ws = workspaces.find(w => w.id === workspaceId);
+    if (ws) await writeConfig(ws.mdxPath, ws.metadataFields, ws.storage);
+  },
+
+  reorderFields: async (workspaceId, orderedFieldIds) => {
+    const workspaces = get().workspaces.map(w => {
+      if (w.id !== workspaceId) return w;
+      const byId = new Map(w.metadataFields.map(f => [f.id, f]));
+      const reordered = orderedFieldIds.map(id => byId.get(id)).filter((f): f is MetadataField => !!f);
+      return { ...w, metadataFields: reordered };
+    });
     set({ workspaces });
     const ws = workspaces.find(w => w.id === workspaceId);
     if (ws) await writeConfig(ws.mdxPath, ws.metadataFields, ws.storage);

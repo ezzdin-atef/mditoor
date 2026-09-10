@@ -81,10 +81,12 @@ export function MetadataFieldEditor({
   mdxPath: string;
   fields: MetadataField[];
 }) {
-  const { addField, updateField, deleteField } = useStore();
+  const { addField, updateField, deleteField, reorderFields } = useStore();
   const { t } = useTranslation();
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<NewField>(BLANK);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<SuggestedField[]>([]);
   const [scanningSuggestions, setScanningSuggestions] = useState(false);
   const { confirm, confirmationDialog } = useConfirmDialog();
@@ -177,6 +179,22 @@ export function MetadataFieldEditor({
       cancelLabel: t('common.cancel'),
     });
     if (confirmed) void deleteField(workspaceId, field.id);
+  };
+
+  const handleDrop = (targetId: string) => {
+    const fromId = draggedId;
+    setDraggedId(null);
+    setDragOverId(null);
+    if (!fromId || fromId === targetId) return;
+
+    const ids = fields.map(f => f.id);
+    const fromIdx = ids.indexOf(fromId);
+    const toIdx = ids.indexOf(targetId);
+    if (fromIdx === -1 || toIdx === -1) return;
+
+    ids.splice(fromIdx, 1);
+    ids.splice(toIdx, 0, fromId);
+    void reorderFields(workspaceId, ids);
   };
 
   return (
@@ -300,6 +318,12 @@ export function MetadataFieldEditor({
               field={field}
               onUpdate={updates => updateField(workspaceId, field.id, updates)}
               onDelete={() => handleDeleteField(field)}
+              isDragging={draggedId === field.id}
+              isDragOver={dragOverId === field.id && draggedId !== field.id}
+              onDragStart={() => setDraggedId(field.id)}
+              onDragEnter={() => { if (draggedId && draggedId !== field.id) setDragOverId(field.id); }}
+              onDragEnd={() => { setDraggedId(null); setDragOverId(null); }}
+              onDrop={() => handleDrop(field.id)}
             />
           ))}
         </div>
@@ -419,10 +443,22 @@ function FieldRow({
   field,
   onUpdate,
   onDelete,
+  isDragging,
+  isDragOver,
+  onDragStart,
+  onDragEnter,
+  onDragEnd,
+  onDrop,
 }: {
   field: MetadataField;
   onUpdate: (updates: Partial<Pick<MetadataField, 'name' | 'type' | 'required' | 'options'>>) => void;
   onDelete: () => void;
+  isDragging: boolean;
+  isDragOver: boolean;
+  onDragStart: () => void;
+  onDragEnter: () => void;
+  onDragEnd: () => void;
+  onDrop: () => void;
 }) {
   const { t } = useTranslation();
   const info = fieldTypeMap[field.type];
@@ -564,13 +600,33 @@ function FieldRow({
 
   return (
     <div
+      onDragEnter={e => { e.preventDefault(); onDragEnter(); }}
+      onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+      onDrop={e => { e.preventDefault(); onDrop(); }}
       className="flex items-center gap-3 px-3 py-2.5 border group transition-all"
       style={{
         background: 'var(--surface)',
-        borderColor: 'var(--border)',
+        borderColor: isDragOver ? typeColor : 'var(--border)',
         borderRadius: '6px',
+        opacity: isDragging ? 0.4 : 1,
       }}
     >
+      <button
+        type="button"
+        draggable
+        onDragStart={e => {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', field.id);
+          onDragStart();
+        }}
+        onDragEnd={onDragEnd}
+        className="flex items-center justify-center flex-shrink-0 w-4 h-4 text-sm select-none"
+        style={{ color: 'var(--text-faint)', background: 'transparent', border: 'none', cursor: 'grab', padding: 0 }}
+        title={t('metadata.dragToReorder')}
+        aria-label={t('metadata.dragToReorder')}
+      >
+        ⠿
+      </button>
       <span className="text-sm flex-shrink-0 select-none" style={{ color: typeColor }}>
         {info.emoji}
       </span>
