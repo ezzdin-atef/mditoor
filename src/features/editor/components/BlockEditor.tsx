@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import hljs from 'highlight.js/lib/core';
+import { CustomSelect } from '../../../components/CustomSelect';
+import { ResolvedImg, useEditorImages, useInlineImages } from './EditorImages';
 import langBash from 'highlight.js/lib/languages/bash';
 import langC from 'highlight.js/lib/languages/c';
 import langCpp from 'highlight.js/lib/languages/cpp';
@@ -170,7 +172,7 @@ function renderInline(raw: string): string {
     tok(`<code class="inline-code">${esc(c)}</code>`));
   // Images (before links)
   s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) =>
-    tok(`<img src="${src}" alt="${esc(alt)}" class="inline-img" />`));
+    tok(`<img data-src="${esc(src).replace(/"/g, '&quot;')}" alt="${esc(alt).replace(/"/g, '&quot;')}" class="inline-img" />`));
   // Links
   s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, href) =>
     tok(`<a href="${href}" target="_blank" rel="noopener noreferrer">${esc(text)}</a>`));
@@ -189,6 +191,14 @@ function renderInline(raw: string): string {
   // Restore token HTML (already safe)
   for (const [k, html] of tokens) s = s.split(k).join(html);
   return s;
+}
+
+/** Rendered inline markdown whose images are resolved against the workspace. */
+function InlineView({ text, fallback, ...props }: { text: string; fallback: string } & React.HTMLAttributes<HTMLDivElement>) {
+  const html = renderInline(text) || fallback;
+  const ref = useRef<HTMLDivElement>(null);
+  useInlineImages(ref, html);
+  return <div ref={ref} {...props} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 function parseTableText(text: string): { headers: string[]; rows: string[][] } {
@@ -542,11 +552,12 @@ function CalloutBlock({
           {emoji}
           {jsxType && <span className="callout-type-badge">{jsxType}</span>}
         </span>
-        <div
+        <InlineView
+          text={content}
+          fallback="&nbsp;"
           className="callout-text block-view"
           dir={dir}
           style={{ ...editorStyle, lineHeight: 1.6 }}
-          dangerouslySetInnerHTML={{ __html: renderInline(content) || '&nbsp;' }}
         />
       </div>
     );
@@ -649,16 +660,15 @@ function CodeBlock({
   return (
     <div className="code-block-wrapper">
       <div className="code-block-header">
-        <select
+        <CustomSelect
           value={lang}
-          onChange={e => update(e.target.value, code)}
-          className="code-lang-select"
-          tabIndex={-1}
-        >
-          {LANG_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+          options={LANG_OPTIONS}
+          onChange={v => update(v, code)}
+          variant="code"
+          size="sm"
+          menuMinWidth={170}
+          ariaLabel="Language"
+        />
         <button
           type="button"
           className="code-copy-btn"
@@ -812,10 +822,7 @@ function TableBlock({
               <tr>
                 {headers.map((h, colIdx) => (
                   <th key={colIdx}>
-                    <div
-                      className="table-cell-view"
-                      dangerouslySetInnerHTML={{ __html: renderInline(h) || '&nbsp;' }}
-                    />
+                    <InlineView text={h} fallback="&nbsp;" className="table-cell-view" />
                   </th>
                 ))}
               </tr>
@@ -825,10 +832,7 @@ function TableBlock({
                 <tr key={rowIdx} className="table-data-row">
                   {row.map((cell, colIdx) => (
                     <td key={colIdx}>
-                      <div
-                        className="table-cell-view"
-                        dangerouslySetInnerHTML={{ __html: renderInline(cell) || '&nbsp;' }}
-                      />
+                      <InlineView text={cell} fallback="&nbsp;" className="table-cell-view" />
                     </td>
                   ))}
                 </tr>
@@ -950,6 +954,18 @@ export function BlockEditor({ value, onChange, editorStyle, onInsertImage }: Pro
   const updateBlock = (blockId: string, updates: Partial<Block>) => {
     const next = blocks.map(b => b.id === blockId ? { ...b, ...updates } : b);
     emit(next);
+  };
+
+  const images = useEditorImages();
+  // Image blocks open the viewer; without the images context they fall back to editing.
+  const openImage = (blockId: string, alt: string, src: string, edit: () => void) => {
+    if (!images) { edit(); return; }
+    images.openViewer({
+      src,
+      alt,
+      onEdit: edit,
+      onReplaceSrc: next => updateBlock(blockId, { text: `![${alt}](${next})` }),
+    });
   };
 
   const insertAfter = (blockId: string, nextBlock = block('paragraph')) => {
@@ -1116,20 +1132,28 @@ export function BlockEditor({ value, onChange, editorStyle, onInsertImage }: Pro
                   className="image-block"
                   tabIndex={0}
                   data-block-input={b.id}
-                  onClick={enterEditMode}
+                  onClick={() => openImage(b.id, imgMatch[1], imgMatch[2], enterEditMode)}
+                  onDoubleClick={enterEditMode}
                   onKeyDown={e => {
                     if (e.key === 'Enter') { e.preventDefault(); insertAfter(b.id); }
+                    if (e.key === ' ') { e.preventDefault(); openImage(b.id, imgMatch[1], imgMatch[2], enterEditMode); }
                     if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); removeBlock(b.id); }
                   }}
                 >
-                  <img src={imgMatch[2]} alt={imgMatch[1]} className="image-block-img" />
+                  <ResolvedImg
+                    src={imgMatch[2]}
+                    alt={imgMatch[1]}
+                    className="image-block-img"
+                    onOpen={() => openImage(b.id, imgMatch[1], imgMatch[2], enterEditMode)}
+                  />
                 </div>
               ) : !isEditing ? (
-                <div
+                <InlineView
+                  text={b.text}
+                  fallback={' '}
                   className={`block-editor-input block-${b.type} block-view`}
                   style={textStyle}
                   onClick={enterEditMode}
-                  dangerouslySetInnerHTML={{ __html: renderInline(b.text) || ' ' }}
                 />
               ) : (
                 <AutoTextarea

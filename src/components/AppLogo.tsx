@@ -1,0 +1,15 @@
+/** The Mditoor mark: split nib (teal = LTR, coral = RTL) with an ink drop. Mirrors src-tauri/icons/icon-source.svg. */
+export function AppLogo({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 120 120" aria-hidden="true" className={className}>
+      <rect width="120" height="120" rx="28" fill="#fdf6ee" />
+      <g transform="translate(0 -10)">
+        <path d="M60 104 L40 66 Q36 58 40 52 L43 47 V28 Q43 22 49 22 H60 Z" fill="#0d8f86" />
+        <path d="M60 104 L80 66 Q84 58 80 52 L77 47 V28 Q77 22 71 22 H60 Z" fill="#ff7a59" />
+        <line x1="60" y1="106" x2="60" y2="62" stroke="#fdf6ee" strokeWidth="3.5" />
+        <circle cx="60" cy="58" r="6" fill="#fdf6ee" />
+      </g>
+      <path d="M60 97 C55 104 54 108 60 110 C66 108 65 104 60 97 Z" fill="#ffb020" />
+    </svg>
+  );
+}

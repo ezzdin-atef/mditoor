@@ -2,7 +2,14 @@ import { create } from 'zustand';
 
 export type Route =
   | { page: 'workspace' }
-  | { page: 'editor'; workspaceId: string; slug: string; isNew: boolean }
+  | {
+      page: 'editor';
+      workspaceId: string;
+      slug: string;
+      isNew: boolean;
+      /** Starting content for a new post (e.g. created from an idea). */
+      seed?: { title?: string; body?: string };
+    }
   | { page: 'settings' };
 
 interface RouterStore {

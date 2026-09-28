@@ -4,8 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { CustomSelect } from '../../../components/CustomSelect';
 import { useConfirmDialog } from '../../../components/ConfirmDialog';
 import { fieldTypeMap, useStore } from '../store';
-import type { FieldType, MetadataField } from '../types';
-import { parseFrontmatter } from '../../editor/utils/frontmatter';
+import type { FieldType, MetadataField, SiteProfile } from '../types';
+import { parseFrontmatterBlock } from '../../editor/utils/frontmatter';
+import type { PostSummary } from '../../posts/postMeta';
 
 const FIELD_TYPES: FieldType[] = ['text', 'number', 'boolean', 'date', 'select', 'tags', 'image'];
 
@@ -75,10 +76,12 @@ function inferType(values: unknown[]): { type: FieldType; options?: string[] } {
 export function MetadataFieldEditor({
   workspaceId,
   mdxPath,
+  profile,
   fields,
 }: {
   workspaceId: string;
   mdxPath: string;
+  profile: SiteProfile;
   fields: MetadataField[];
 }) {
   const { addField, updateField, deleteField, reorderFields } = useStore();
@@ -107,20 +110,16 @@ export function MetadataFieldEditor({
     async function scan() {
       setScanningSuggestions(true);
       try {
-        const slugs = await invoke<string[]>('list_mdx_slugs', { path: mdxPath });
+        // One list_posts call returns every post's frontmatter instead of N file reads.
+        const posts = await invoke<Pick<PostSummary, 'frontmatter' | 'frontmatter_format'>[]>('list_posts', { path: mdxPath, profile });
         const buckets = new Map<string, unknown[]>();
-        await Promise.all(slugs.map(async slug => {
-          try {
-            const content = await invoke<string>('read_post', { mdxPath, slug });
-            const { meta } = parseFrontmatter(content);
-            Object.entries(meta).forEach(([key, value]) => {
-              if (configured.has(key)) return;
-              buckets.set(key, [...(buckets.get(key) ?? []), value]);
-            });
-          } catch {
-            // Ignore unreadable posts; suggestions are opportunistic.
-          }
-        }));
+        for (const post of posts) {
+          const meta = (post.frontmatter_format && parseFrontmatterBlock(post.frontmatter, post.frontmatter_format)) || {};
+          Object.entries(meta).forEach(([key, value]) => {
+            if (configured.has(key)) return;
+            buckets.set(key, [...(buckets.get(key) ?? []), value]);
+          });
+        }
 
         if (cancelled) return;
         setSuggestions(Array.from(buckets.entries()).map(([name, values]) => {
@@ -136,7 +135,7 @@ export function MetadataFieldEditor({
 
     void scan();
     return () => { cancelled = true; };
-  }, [fields, mdxPath]);
+  }, [fields, mdxPath, profile]);
 
   const visibleSuggestions = suggestions.filter(s => !dismissed.has(s.name));
 
@@ -635,14 +634,14 @@ function FieldRow({
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span
             className="text-[10px] px-1.5 py-0.5 font-medium"
-            style={{ background: `${typeColor}18`, color: typeColor, borderRadius: '3px' }}
+            style={{ background: `color-mix(in srgb, ${typeColor} 13%, transparent)`, color: typeColor, borderRadius: '3px' }}
           >
             {info.label}
           </span>
           {field.required && (
             <span
               className="text-[10px] px-1.5 py-0.5 font-medium"
-              style={{ background: 'var(--accent-faint)', color: 'var(--red)', borderRadius: '3px' }}
+              style={{ background: 'color-mix(in srgb, var(--red) 12%, transparent)', color: 'var(--red)', borderRadius: '999px' }}
             >
               {t('metadata.requiredLabel')}
             </span>
@@ -660,8 +659,8 @@ function FieldRow({
           className="mac-btn text-[11px] px-2 py-0.5"
           style={{
             color: field.required ? 'var(--red)' : 'var(--text-muted)',
-            border: `1px solid ${field.required ? 'var(--accent)' : 'var(--border-2)'}`,
-            background: field.required ? 'var(--accent-faint)' : 'var(--surface-2)',
+            border: `1px solid ${field.required ? 'color-mix(in srgb, var(--red) 35%, transparent)' : 'var(--border-2)'}`,
+            background: field.required ? 'color-mix(in srgb, var(--red) 10%, transparent)' : 'var(--surface-2)',
           }}
         >
           {field.required ? t('metadata.requiredLabel') : t('metadata.optionalLabel')}
@@ -683,7 +682,7 @@ function FieldRow({
           style={{ color: 'var(--text-faint)', background: 'transparent' }}
           onMouseEnter={e => {
             (e.currentTarget as HTMLElement).style.color = 'var(--red)';
-            (e.currentTarget as HTMLElement).style.background = 'var(--accent-faint)';
+            (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--red) 10%, transparent)';
           }}
           onMouseLeave={e => {
             (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';

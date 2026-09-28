@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { marked } from 'marked';
 import { useTranslation } from 'react-i18next';
 import { pickImageFile, uploadImage } from '../../assets/imageUpload';
-import { useRouter } from '../../../router';
+import { useRouter, type Route } from '../../../router';
 import { useStore } from '../../workspace/store';
 import {
   EDITOR_FONT,
@@ -14,6 +14,14 @@ import {
 import { FloatingToolbar } from '../components/FloatingToolbar';
 import { BlockEditor } from '../components/BlockEditor';
 import { MetadataSidebar } from '../components/MetadataSidebar';
+import { EditorImagesProvider, ResolvedHtml } from '../components/EditorImages';
+import { IconArrowLeft, IconCheck, IconAlert, IconFolder, IconTrash } from '../../../components/Icons';
+import { ActionMenu } from '../../../components/ActionMenu';
+import { usePostDelete } from '../../posts/usePostDelete';
+import { postFileName } from '../../posts/postMeta';
+import type { FrontmatterFormat } from '../../workspace/types';
+import { revealItemInDir } from '@tauri-apps/plugin-opener';
+import { toast } from '../../../components/Toast';
 import {
   buildContent,
   defaultMeta,
@@ -23,19 +31,29 @@ import {
 
 type ViewMode = 'edit' | 'split' | 'preview';
 type EditorMode = 'blocks' | 'markdown';
+type EditorRoute = Extract<Route, { page: 'editor' }>;
 
+// Hooks must run unconditionally, so the route guard lives in a thin wrapper.
 export function EditorPage() {
-  const { route, navigate } = useRouter();
+  const { route } = useRouter();
+  if (route.page !== 'editor') return null;
+  return <EditorScreen route={route} />;
+}
+
+function EditorScreen({ route }: { route: EditorRoute }) {
+  const { navigate } = useRouter();
   const { workspaces } = useStore();
   const settings = useSettings();
   const { t } = useTranslation();
-
-  if (route.page !== 'editor') return null;
 
   const workspace = workspaces.find(w => w.id === route.workspaceId) ?? null;
 
   const [body,       setBodyRaw]    = useState('');
   const [meta,       setMeta]       = useState<MetaValues>({});
+  // Frontmatter format the post was read in; null (new post, or none yet) uses the workspace default.
+  const [fmFormat, setFmFormat] = useState<FrontmatterFormat | null>(null);
+  // Original frontmatter text; fields outside the schema are copied back from it on save.
+  const [fmRaw, setFmRaw] = useState('');
   const [viewMode,   setViewMode]   = useState<ViewMode>('edit');
   const [editorMode, setEditorMode] = useState<EditorMode>('blocks');
   const [loading,    setLoading]    = useState(true);
@@ -57,16 +75,33 @@ export function EditorPage() {
     setSaveStatus('idle');
     setDirty(false);
     setUploadMessage(null);
+    setFmFormat(null);
+    setFmRaw('');
     if (route.isNew) {
-      setMeta(defaultMeta(workspace.metadataFields));
-      setBodyRaw('');
+      const meta = defaultMeta(workspace.metadataFields);
+      let body = route.seed?.body?.trim() ? `${route.seed.body.trim()}\n` : '';
+      const seedTitle = route.seed?.title?.trim();
+      if (seedTitle) {
+        // Put the title in the schema's title field; without one, open the body with an H1.
+        const titleField =
+          workspace.metadataFields.find(f => f.type === 'text' && f.name.toLowerCase() === 'title') ??
+          workspace.metadataFields.find(f => f.type === 'text');
+        if (titleField) meta[titleField.name] = seedTitle;
+        else body = `# ${seedTitle}\n\n${body}`;
+      }
+      setMeta(meta);
+      setBodyRaw(body);
+      // Seeded posts are marked dirty so auto-save (or Ctrl+S) writes them out.
+      setDirty(Boolean(route.seed));
       setLoading(false);
       return;
     }
-    invoke<string>('read_post', { mdxPath: workspace.mdxPath, slug: route.slug })
+    invoke<string>('read_post', { mdxPath: workspace.mdxPath, slug: route.slug, profile: workspace.profile })
       .then(content => {
         const p = parseFrontmatter(content);
         setMeta(p.meta);
+        setFmFormat(p.format);
+        setFmRaw(p.raw);
         setBodyRaw(p.body);
       })
       .catch(() => {
@@ -77,25 +112,57 @@ export function EditorPage() {
         setDirty(false);
         setLoading(false);
       });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspace?.id, route.slug, route.isNew]);
 
-  const save = useCallback(async () => {
-    if (!workspace || saving || !dirty) return;
+  // Set once the post is deleted so a pending auto-save can't re-create the file.
+  const deletedRef = useRef(false);
+  // Whether the post file exists on disk (false for a new post until its first save).
+  const [onDisk, setOnDisk] = useState(!route.isNew);
+  const { deletePost, confirmationDialog } = usePostDelete();
+
+  const save = useCallback(async (): Promise<boolean> => {
+    if (!workspace || saving || !dirty || deletedRef.current) return true;
     setSaving(true);
     setSaveStatus('saving');
     try {
-      const content = buildContent(workspace.metadataFields, meta, body);
-      await invoke('write_post', { mdxPath: workspace.mdxPath, slug: route.slug, content });
+      const content = buildContent(workspace.metadataFields, meta, body, fmFormat ?? workspace.profile.frontmatter, fmRaw);
+      await invoke('write_post', { mdxPath: workspace.mdxPath, slug: route.slug, content, profile: workspace.profile });
+      setOnDisk(true);
       setDirty(false);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2500);
-    } catch {
+      return true;
+    } catch (e) {
       setSaveStatus('error');
+      toast.error(t('editor.saveFailed'), String(e));
       setTimeout(() => setSaveStatus('idle'), 3000);
+      return false;
     } finally {
       setSaving(false);
     }
-  }, [body, dirty, meta, route.slug, saving, workspace]);
+  }, [body, dirty, fmFormat, fmRaw, meta, route.slug, saving, t, workspace]);
+
+  // Leaving with unsaved edits used to drop them silently; save first.
+  const goBack = useCallback(async () => {
+    if (dirty && !(await save())) return;
+    navigate({ page: 'workspace' });
+  }, [dirty, navigate, save]);
+
+  const removePost = useCallback(async () => {
+    if (!workspace) return;
+    if (!onDisk) {
+      // Never saved: nothing on disk to delete, just drop the draft.
+      deletedRef.current = true;
+      navigate({ page: 'workspace' });
+      return;
+    }
+    const title = typeof meta.title === 'string' && meta.title.trim() ? meta.title : route.slug;
+    if (await deletePost(workspace, route.slug, title)) {
+      deletedRef.current = true;
+      navigate({ page: 'workspace' });
+    }
+  }, [deletePost, meta.title, navigate, onDisk, route.slug, workspace]);
 
   const wrapInline = (mark: string) => {
     const ta = textareaRef.current;
@@ -116,7 +183,7 @@ export function EditorPage() {
     try {
       const filePath = await pickImageFile();
       if (!filePath) return null;
-      const url = await uploadImage(filePath, workspace.storage);
+      const url = await uploadImage(filePath, workspace, route.slug);
       setUploadMessage(null);
       return url;
     } catch (e) {
@@ -124,7 +191,7 @@ export function EditorPage() {
       setUploadMessage(e instanceof Error ? e.message : t('storage.notConfiguredHint'));
       return null;
     }
-  }, [t, workspace]);
+  }, [route.slug, t, workspace]);
 
   // Upload an image and insert MDX syntax at cursor
   const handleInsertImage = useCallback(async () => {
@@ -148,18 +215,17 @@ export function EditorPage() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
-      if (mod && e.key === 's') { e.preventDefault(); void save(); }
-      if (mod && e.key === 'b') { e.preventDefault(); wrapInline('**'); }
-      if (mod && e.shiftKey && e.key.toLowerCase() === 'i') {
-        e.preventDefault();
-        void handleInsertImage();
-        return;
-      }
-      if (mod && e.key === 'i') { e.preventDefault(); wrapInline('*'); }
+      if (!mod) return;
+      if (e.key.toLowerCase() === 's') { e.preventDefault(); void save(); return; }
+      // Formatting shortcuts target the raw textarea; block mode handles its own.
+      if (editorMode !== 'markdown') return;
+      if (e.shiftKey && e.key.toLowerCase() === 'i') { e.preventDefault(); void handleInsertImage(); return; }
+      if (e.key === 'b') { e.preventDefault(); wrapInline('**'); }
+      if (e.key === 'i') { e.preventDefault(); wrapInline('*'); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [body, handleInsertImage, save]);
+  });
 
   useEffect(() => {
     if (!settings.autoSave || !dirty || loading || saving) return;
@@ -173,22 +239,20 @@ export function EditorPage() {
     lineHeight: EDITOR_LINE_HEIGHT[settings.editorLineHeight],
   };
 
-  const previewHtml = (() => {
+  const previewHtml = useMemo(() => {
+    if (viewMode === 'edit') return '';
     try { return marked.parse(body) as string; }
     catch { return body; }
-  })();
+  }, [body, viewMode]);
+
+  const title = typeof meta.title === 'string' && meta.title.trim() ? meta.title : null;
 
   if (!workspace) {
     return (
-      <div
-        className="flex flex-col items-center justify-center h-screen gap-4 mac-fade-in"
-        style={{ background: 'var(--bg)' }}
-      >
-        <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{t('editor.notFound')}</p>
-        <button
-          onClick={() => navigate({ page: 'workspace' })}
-          className="mac-btn mac-btn-primary"
-        >
+      <div className="flex flex-col items-center justify-center h-full gap-4 mac-fade-in" style={{ background: 'var(--bg)' }}>
+        <div className="empty-illustration">🧭</div>
+        <p className="empty-state-title">{t('editor.notFound')}</p>
+        <button onClick={() => navigate({ page: 'workspace' })} className="mac-btn mac-btn-primary">
           {t('editor.goBack')}
         </button>
       </div>
@@ -196,77 +260,48 @@ export function EditorPage() {
   }
 
   return (
-    <div
-      className="flex flex-col h-screen overflow-hidden"
-      style={{ background: 'var(--bg)' }}
-    >
+    <EditorImagesProvider workspace={workspace} slug={route.slug}>
+    <div className="flex flex-col h-full overflow-hidden" style={{ background: 'var(--bg)' }}>
       {/* ═══ Header ═══ */}
-      <header
-        className="editor-header flex items-center gap-2 px-3 flex-shrink-0 border-b"
-      >
-        {/* Back */}
+      <header className="editor-header flex items-center gap-2 px-3 flex-shrink-0 border-b">
         <button
-          onClick={() => navigate({ page: 'workspace' })}
-          className="editor-back-btn flex items-center gap-1.5 flex-shrink-0"
+          onClick={() => void goBack()}
+          className="editor-back-btn flex items-center gap-2 flex-shrink-0"
+          title={t('nav.back')}
         >
-          <span className="rtl-mirror text-xs" style={{ color: 'var(--sb-muted)' }}>&larr;</span>
-          <div
-            className="editor-workspace-icon flex-shrink-0"
-            aria-hidden="true"
-          >
-            {workspace.icon}
-          </div>
-          <span className="text-xs hidden sm:block" style={{ color: 'var(--sb-muted)' }}>
-            {workspace.name}
-          </span>
+          <IconArrowLeft size={15} mirror />
+          <span className="editor-workspace-icon flex-shrink-0" aria-hidden="true">{workspace.icon}</span>
+          <span className="text-[13px] font-medium hidden sm:block">{workspace.name}</span>
         </button>
 
-        {/* Divider */}
-        <div className="w-px h-3.5 flex-shrink-0" style={{ background: 'var(--sb-border)' }} />
+        <span className="flex-shrink-0" style={{ color: 'var(--text-faint)' }}>/</span>
 
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-0.5 min-w-0 flex-1">
-          <span
-            className="text-xs mac-input-mono truncate"
-            style={{ color: 'var(--sb-muted)' }}
-          >
-            {route.slug}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <span className="text-[13px] font-semibold truncate" style={{ color: 'var(--text)' }} dir="auto">
+            {title ?? route.slug}
           </span>
-          <span className="text-xs mac-input-mono flex-shrink-0" style={{ color: 'var(--sb-muted)', opacity: 0.45 }}>
-            /index.mdx
-          </span>
-          {route.isNew && (
-            <span
-              className="text-[10px] px-1.5 py-0.5 flex-shrink-0 mac-fade-slide"
-              style={{ marginInlineStart: '0.375rem', background: 'var(--accent-faint)', color: 'var(--accent)' }}
-            >
-              {t('editor.new')}
+          {title && (
+            <span className="text-[11.5px] mac-input-mono truncate hidden md:inline" style={{ color: 'var(--text-faint)' }}>
+              {postFileName(workspace.profile, route.slug)}
             </span>
           )}
+          {route.isNew && <span className="badge badge-accent flex-shrink-0">{t('editor.new')}</span>}
         </div>
 
         {/* Save status */}
-        {dirty && saveStatus === 'idle' && (
-          <div
-            className="editor-dirty-dot flex-shrink-0"
-            title={t('editor.unsaved')}
-          />
-        )}
-        {saveStatus === 'saving' && (
-          <span className="text-[11px] flex-shrink-0" style={{ color: 'var(--sb-muted)' }}>
-            {t('editor.saving')}
-          </span>
-        )}
-        {saveStatus === 'saved' && (
-          <span className="text-[11px] flex-shrink-0 mac-fade-slide" style={{ color: 'var(--green)' }}>
-            {t('editor.saved')}
-          </span>
-        )}
-        {saveStatus === 'error' && (
-          <span className="text-[11px] flex-shrink-0" style={{ color: 'var(--red)' }}>{t('editor.error')}</span>
-        )}
+        <span className="flex items-center gap-1.5 text-[12px] flex-shrink-0" aria-live="polite">
+          {dirty && saveStatus === 'idle' && (
+            <><span className="editor-dirty-dot" /><span className="hidden lg:inline" style={{ color: 'var(--text-muted)' }}>{t('editor.unsaved')}</span></>
+          )}
+          {saveStatus === 'saving' && <span style={{ color: 'var(--text-muted)' }}>{t('editor.saving')}</span>}
+          {saveStatus === 'saved' && (
+            <span className="inline-flex items-center gap-1 mac-fade-slide" style={{ color: 'var(--green)' }}><IconCheck size={13} />{t('editor.saved')}</span>
+          )}
+          {saveStatus === 'error' && (
+            <span className="inline-flex items-center gap-1" style={{ color: 'var(--red)' }}><IconAlert size={13} />{t('editor.error')}</span>
+          )}
+        </span>
 
-        {/* View mode segment control */}
         <div className="mac-segmented flex-shrink-0">
           {(['blocks', 'markdown'] as EditorMode[]).map(m => (
             <button
@@ -293,24 +328,50 @@ export function EditorPage() {
           ))}
         </div>
 
-        {/* Save button */}
         <button
-          onClick={save}
+          onClick={() => void save()}
           disabled={saving || !dirty}
-          className="mac-btn mac-btn-primary flex-shrink-0 disabled:opacity-30"
+          className="mac-btn mac-btn-primary flex-shrink-0"
         >
-          {saving ? '...' : t('editor.save')}
+          {saving ? t('editor.saving') : t('editor.save')}
         </button>
+
+        <ActionMenu
+          label={t('posts.actions.more')}
+          items={[
+            ...(onDisk ? [{
+              label: t('posts.actions.reveal'),
+              icon: <IconFolder size={14} />,
+              onSelect: () => {
+                invoke<string>('post_path', { mdxPath: workspace.mdxPath, slug: route.slug, profile: workspace.profile })
+                  .then(revealItemInDir)
+                  .catch(e => toast.error(t('posts.actions.revealFailed'), String(e)));
+              },
+            }] : []),
+            {
+              label: onDisk ? t('posts.actions.delete') : t('posts.actions.discard'),
+              icon: <IconTrash size={14} />,
+              danger: true,
+              separated: onDisk,
+              onSelect: () => void removePost(),
+            },
+          ]}
+        />
       </header>
+      {confirmationDialog}
 
       {/* ═══ Body ═══ */}
       {loading ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3">
-          <p className="text-sm" style={{ color: 'var(--text-faint)' }}>{t('common.loading')}</p>
+        <div className="flex-1 flex flex-col items-center pt-24 gap-3">
+          <div className="w-[min(60ch,80%)] space-y-3">
+            <div className="skeleton" style={{ height: 28, width: '60%' }} />
+            <div className="skeleton" style={{ height: 14 }} />
+            <div className="skeleton" style={{ height: 14, width: '90%' }} />
+            <div className="skeleton" style={{ height: 14, width: '75%' }} />
+          </div>
         </div>
       ) : (
         <div className="editor-body flex-1 flex overflow-hidden">
-          {/* Metadata sidebar */}
           {viewMode !== 'preview' && (
             <MetadataSidebar
               fields={workspace.metadataFields}
@@ -325,28 +386,27 @@ export function EditorPage() {
             />
           )}
 
-          {/* Editor + preview */}
           <div className="flex-1 flex overflow-hidden">
-            {/* Edit pane */}
             {(viewMode === 'edit' || viewMode === 'split') && (
               <div
                 className="editor-pane flex flex-col overflow-hidden"
                 style={{
                   flex: viewMode === 'split' ? '0 0 50%' : '1 1 0',
                   borderInlineEnd: viewMode === 'split' ? '1px solid var(--border)' : 'none',
-              }}
-            >
+                }}
+              >
                 {uploadMessage && (
                   <div
-                    className="mx-auto mt-3 max-w-2xl rounded px-3 py-2 text-xs mac-fade-slide"
+                    className="mx-auto mt-3 max-w-2xl px-3 py-2 text-xs mac-fade-slide flex items-start gap-2"
                     style={{
-                      background: 'var(--surface)',
-                      border: '1px solid var(--border)',
+                      background: 'color-mix(in srgb, var(--orange) 10%, var(--bg))',
+                      border: '1px solid color-mix(in srgb, var(--orange) 30%, transparent)',
+                      borderRadius: 10,
                       color: 'var(--text-muted)',
                     }}
                   >
-                    <strong style={{ color: 'var(--text)' }}>{t('storage.notConfigured')}.</strong>{' '}
-                    {uploadMessage}
+                    <IconAlert size={14} style={{ color: 'var(--orange)', flexShrink: 0, marginTop: 1 }} />
+                    <span><strong style={{ color: 'var(--text)' }}>{t('storage.notConfigured')}.</strong>{' '}{uploadMessage}</span>
                   </div>
                 )}
                 {editorMode === 'blocks' ? (
@@ -386,50 +446,33 @@ export function EditorPage() {
                           const orderedM = /^(\s*)(\d+)\.\s(.*)$/.exec(line);
                           const quoteM   = /^(>+\s?)(.*)$/.exec(line);
 
+                          const continueWith = (cont: string, content: string) => {
+                            e.preventDefault();
+                            if (!content.trim()) {
+                              setBody(body.slice(0, lineStart) + body.slice(s));
+                              requestAnimationFrame(() => { ta.setSelectionRange(lineStart, lineStart); ta.focus(); });
+                            } else {
+                              setBody(body.slice(0, s) + cont + body.slice(s));
+                              requestAnimationFrame(() => { ta.setSelectionRange(s + cont.length, s + cont.length); ta.focus(); });
+                            }
+                          };
+
                           if (bulletM) {
-                            e.preventDefault();
                             const [, indent, marker, content] = bulletM;
-                            if (!content.trim()) {
-                              setBody(body.slice(0, lineStart) + body.slice(s));
-                              requestAnimationFrame(() => { ta.setSelectionRange(lineStart, lineStart); ta.focus(); });
-                            } else {
-                              const cont = `\n${indent}${marker} `;
-                              setBody(body.slice(0, s) + cont + body.slice(s));
-                              requestAnimationFrame(() => { ta.setSelectionRange(s + cont.length, s + cont.length); ta.focus(); });
-                            }
+                            continueWith(`\n${indent}${marker} `, content);
                           } else if (orderedM) {
-                            e.preventDefault();
                             const [, indent, numStr, content] = orderedM;
-                            if (!content.trim()) {
-                              setBody(body.slice(0, lineStart) + body.slice(s));
-                              requestAnimationFrame(() => { ta.setSelectionRange(lineStart, lineStart); ta.focus(); });
-                            } else {
-                              const cont = `\n${indent}${parseInt(numStr, 10) + 1}. `;
-                              setBody(body.slice(0, s) + cont + body.slice(s));
-                              requestAnimationFrame(() => { ta.setSelectionRange(s + cont.length, s + cont.length); ta.focus(); });
-                            }
+                            continueWith(`\n${indent}${parseInt(numStr, 10) + 1}. `, content);
                           } else if (quoteM) {
-                            e.preventDefault();
                             const [, prefix, content] = quoteM;
-                            if (!content.trim()) {
-                              setBody(body.slice(0, lineStart) + body.slice(s));
-                              requestAnimationFrame(() => { ta.setSelectionRange(lineStart, lineStart); ta.focus(); });
-                            } else {
-                              const cont = `\n${prefix}`;
-                              setBody(body.slice(0, s) + cont + body.slice(s));
-                              requestAnimationFrame(() => { ta.setSelectionRange(s + cont.length, s + cont.length); ta.focus(); });
-                            }
+                            continueWith(`\n${prefix}`, content);
                           }
                         }
                       }}
                       spellCheck
                       placeholder={t('editor.placeholder')}
                       className="editor-markdown-textarea flex-1 resize-none focus:outline-none"
-                      style={{
-                        ...editorStyle,
-                        unicodeBidi: 'plaintext',
-                        textAlign: 'start',
-                      }}
+                      style={{ ...editorStyle, unicodeBidi: 'plaintext', textAlign: 'start' }}
                     />
                     <FloatingToolbar
                       textareaRef={textareaRef}
@@ -442,26 +485,20 @@ export function EditorPage() {
               </div>
             )}
 
-            {/* Preview pane */}
             {(viewMode === 'preview' || viewMode === 'split') && (
-              <div
-                className="editor-preview-pane flex-1 overflow-y-auto"
-              >
+              <div className="editor-preview-pane flex-1 overflow-y-auto">
                 {body.trim() === '' ? (
-                  <div className="flex flex-col items-center justify-center h-full text-center px-8">
-                    <p className="text-sm" style={{ color: 'var(--text-faint)' }}>
-                      {t('editor.noPreview')}
-                    </p>
-                    <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>
-                      {t('editor.noPreviewHint')}
-                    </p>
+                  <div className="empty-state h-full">
+                    <div className="empty-illustration">👀</div>
+                    <p className="empty-state-title">{t('editor.noPreview')}</p>
+                    <p className="empty-state-hint">{t('editor.noPreviewHint')}</p>
                   </div>
                 ) : (
-                  <div
+                  <ResolvedHtml
+                    html={previewHtml}
                     dir="auto"
                     className="prose editor-prose"
                     style={{ color: 'var(--text)', unicodeBidi: 'plaintext' }}
-                    dangerouslySetInnerHTML={{ __html: previewHtml }}
                   />
                 )}
               </div>
@@ -470,5 +507,6 @@ export function EditorPage() {
         </div>
       )}
     </div>
+    </EditorImagesProvider>
   );
 }

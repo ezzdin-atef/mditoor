@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from './router';
 import { applyTheme, useSettings, type Settings } from './features/settings/store';
 import { useStore, type StoredWorkspace } from './features/workspace/store';
@@ -7,6 +8,8 @@ import { WorkspacePage } from './features/workspace/pages/WorkspacePage';
 import { EditorPage } from './features/editor/pages/EditorPage';
 import { SettingsPage } from './features/settings/pages/SettingsPage';
 import { CommandPalette } from './CommandPalette';
+import { Toaster } from './components/Toast';
+import { TitleBar, USE_CUSTOM_TITLEBAR } from './components/TitleBar';
 import i18n, { isRtlLanguage } from './i18n';
 import type { AppLanguage } from './i18n';
 
@@ -54,21 +57,55 @@ function useHydrateFromDisk() {
   }, []);
 }
 
+// Ctrl/Cmd+, opens settings from anywhere (the palette advertises it).
+function useGlobalShortcuts() {
+  const { navigate } = useRouter();
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+        e.preventDefault();
+        navigate({ page: 'settings' });
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [navigate]);
+}
+
+function useWindowTitle(): string {
+  const { t } = useTranslation();
+  const { route } = useRouter();
+  const { workspaces, activeId } = useStore();
+  const app = t('app.name');
+  if (route.page === 'settings') return `${t('settings.title')} — ${app}`;
+  if (route.page === 'editor') {
+    const ws = workspaces.find(w => w.id === route.workspaceId);
+    return `${route.slug}${ws ? ` · ${ws.name}` : ''} — ${app}`;
+  }
+  const ws = workspaces.find(w => w.id === activeId);
+  return ws ? `${ws.name} — ${app}` : app;
+}
+
 export default function App() {
   useThemeSync();
   useLanguageSync();
   useHydrateFromDisk();
+  useGlobalShortcuts();
   const { route } = useRouter();
-  const [_ready, setReady] = useState(false);
+  const title = useWindowTitle();
 
-  useEffect(() => { const t = setTimeout(() => setReady(true), 80); return () => clearTimeout(t); }, []);
+  useEffect(() => { document.title = title; }, [title]);
 
   return (
-    <>
-      {route.page === 'editor'   ? <EditorPage />   :
-       route.page === 'settings' ? <SettingsPage />  :
-       <WorkspacePage />}
+    <div className={`app-frame${USE_CUSTOM_TITLEBAR ? ' has-titlebar' : ''}`}>
+      {USE_CUSTOM_TITLEBAR && <TitleBar title={title} tone={route.page === 'editor' ? 'page' : 'app'} />}
+      <div className="app-content">
+        {route.page === 'editor'   ? <EditorPage key={`${route.workspaceId}:${route.slug}`} /> :
+         route.page === 'settings' ? <SettingsPage />  :
+         <WorkspacePage />}
+      </div>
       <CommandPalette />
-    </>
+      <Toaster />
+    </div>
   );
 }

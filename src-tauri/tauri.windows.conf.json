@@ -1,0 +1,15 @@
+{
+  "app": {
+    "windows": [
+      {
+        "title": "Mditoor — MDX Content Studio",
+        "width": 1280,
+        "height": 800,
+        "dragDropEnabled": false,
+        "minWidth": 900,
+        "minHeight": 600,
+        "decorations": false
+      }
+    ]
+  }
+}

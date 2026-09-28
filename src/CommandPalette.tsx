@@ -1,140 +1,74 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { useTranslation } from 'react-i18next';
+import { create } from 'zustand';
 import { useStore } from './features/workspace/store';
+import { useSettings } from './features/settings/store';
+import { toCardData, type PostSummary } from './features/posts/postMeta';
 import { useRouter } from './router';
+import { IconArrowLeft, IconBulb, IconFile, IconSearch, IconSettings, IconSparkles } from './components/Icons';
+import { useIdeas } from './features/ideas/store';
+import { toast } from './components/Toast';
+import { MOD } from './lib/ui';
+
+/* ─── Open state (shared so buttons elsewhere can open the palette) ──── */
+
+const usePaletteStore = create<{ open: boolean; setOpen: (v: boolean | ((o: boolean) => boolean)) => void }>(set => ({
+  open: false,
+  setOpen: v => set(s => ({ open: typeof v === 'function' ? v(s.open) : v })),
+}));
+
+export function openCommandPalette() {
+  usePaletteStore.getState().setOpen(true);
+}
 
 /* ─── Types ──────────────────────────────────────────────────────────── */
-
-type ItemType = 'nav' | 'workspace' | 'post';
 
 interface PaletteItem {
   id: string;
   group: string;
   label: string;
   hint?: string;
-  type: ItemType;
-  icon?: string;
+  icon: ReactNode;
   action: () => void;
-}
-
-/* ─── Icons ──────────────────────────────────────────────────────────── */
-
-function IconSearch() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
-      <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M10.5 10.5L13.5 13.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconNav() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path d="M2 7h10M7 2l5 5-5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function IconDoc() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.1" />
-      <path d="M3.5 4.5h7M3.5 7h7M3.5 9.5h4.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-/* ─── Row ────────────────────────────────────────────────────────────── */
-
-function PaletteRow({
-  item,
-  selected,
-  onMouseEnter,
-}: {
-  item: PaletteItem;
-  selected: boolean;
-  onMouseEnter: () => void;
-}) {
-  return (
-    <button
-      onClick={item.action}
-      onMouseEnter={onMouseEnter}
-      className="w-full flex items-center gap-3 px-4 py-2"
-      style={{
-        background: selected ? 'var(--text)' : 'transparent',
-        color: selected ? 'var(--bg)' : 'var(--text)',
-      }}
-    >
-      {/* Type icon */}
-      <span
-        className="flex-shrink-0"
-        style={{ color: selected ? 'var(--surface-2)' : 'var(--text-faint)' }}
-      >
-        {item.type === 'workspace' && item.icon ? (
-          <span className="block text-[14px]" aria-hidden="true">
-            {item.icon}
-          </span>
-        ) : item.type === 'post' ? (
-          <IconDoc />
-        ) : (
-          <IconNav />
-        )}
-      </span>
-
-      {/* Label */}
-      <span className="flex-1 text-[13px] truncate" style={{ fontWeight: selected ? 700 : 400 }}>{item.label}</span>
-
-      {/* Hint */}
-      {item.hint && (
-        <span
-          className="text-[11px] mac-input-mono flex-shrink-0 truncate max-w-[140px]"
-          style={{ color: selected ? 'var(--surface-2)' : 'var(--text-faint)', opacity: 0.75 }}
-        >
-          {item.hint}
-        </span>
-      )}
-    </button>
-  );
 }
 
 /* ─── Command Palette ────────────────────────────────────────────────── */
 
 export function CommandPalette() {
-  const [open,      setOpen]      = useState(false);
-  const [query,     setQuery]     = useState('');
-  const [selected,  setSelected]  = useState(0);
-  const [postSlugs, setPostSlugs] = useState<string[]>([]);
+  const { t } = useTranslation();
+  const { open, setOpen } = usePaletteStore();
+  const [query,    setQuery]    = useState('');
+  const [selected, setSelected] = useState(0);
+  const [posts,    setPosts]    = useState<PostSummary[]>([]);
 
-  const inputRef  = useRef<HTMLInputElement>(null);
+  const inputRef   = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
   const { workspaces, activeId, setActive } = useStore();
+  const { theme, update } = useSettings();
   const { navigate } = useRouter();
   const active = workspaces.find(w => w.id === activeId) ?? null;
 
-  /* Open/close on Cmd+K */
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setOpen(v => !v);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [setOpen]);
 
-  /* Fetch posts when palette opens */
   useEffect(() => {
-    if (!open || !active) { setPostSlugs([]); return; }
-    invoke<string[]>('list_mdx_slugs', { path: active.mdxPath })
-      .then(setPostSlugs)
-      .catch(() => setPostSlugs([]));
+    if (!open || !active) { setPosts([]); return; }
+    invoke<PostSummary[]>('list_posts', { path: active.mdxPath, profile: active.profile })
+      .then(setPosts)
+      .catch(() => setPosts([]));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, active?.id]);
+  }, [open, active?.id, active?.mdxPath, active?.profile]);
 
-  /* Focus + reset on open */
   useEffect(() => {
     if (open) {
       setQuery('');
@@ -143,235 +77,190 @@ export function CommandPalette() {
     }
   }, [open]);
 
-  const close = useCallback(() => setOpen(false), []);
+  const close = useCallback(() => setOpen(false), [setOpen]);
 
-  /* Build item list */
-  const navItems: PaletteItem[] = [
-    {
-      id: 'nav-home',
-      group: 'Navigation',
-      label: 'Go to Workspaces',
-      hint: '',
-      type: 'nav',
-      action: () => { navigate({ page: 'workspace' }); close(); },
-    },
-    {
-      id: 'nav-settings',
-      group: 'Navigation',
-      label: 'Open Settings',
-      hint: '⌘,',
-      type: 'nav',
-      action: () => { navigate({ page: 'settings' }); close(); },
-    },
-  ];
-
-  const workspaceItems: PaletteItem[] = workspaces.map(w => {
-    return {
+  const allItems = useMemo<PaletteItem[]>(() => {
+    const nav: PaletteItem[] = [
+      {
+        id: 'nav-home', group: t('palette.groups.navigation'), label: t('palette.goWorkspaces'),
+        icon: <IconArrowLeft size={15} mirror />, action: () => navigate({ page: 'workspace' }),
+      },
+      {
+        id: 'nav-settings', group: t('palette.groups.navigation'), label: t('palette.openSettings'), hint: `${MOD},`,
+        icon: <IconSettings size={15} />, action: () => navigate({ page: 'settings' }),
+      },
+      {
+        id: 'act-theme', group: t('palette.groups.actions'),
+        label: theme === 'dark' ? t('palette.lightMode') : t('palette.darkMode'),
+        icon: <IconSparkles size={15} />, action: () => update('theme', theme === 'dark' ? 'light' : 'dark'),
+      },
+    ];
+    const ws: PaletteItem[] = workspaces.map(w => ({
       id: `ws-${w.id}`,
-      group: 'Workspaces',
+      group: t('palette.groups.workspaces'),
       label: w.name,
       hint: w.mdxPath,
-      type: 'workspace',
-      icon: w.icon,
+      icon: <span className="text-[15px] leading-none">{w.icon}</span>,
+      action: () => { void setActive(w.id); navigate({ page: 'workspace' }); },
+    }));
+    const postItems: PaletteItem[] = active
+      ? posts.map(p => {
+          const card = toCardData(p, active.metadataFields);
+          return {
+            id: `post-${p.slug}`,
+            group: t('palette.groups.posts'),
+            label: card.title,
+            hint: p.slug,
+            icon: <IconFile size={15} />,
+            action: () => navigate({ page: 'editor', workspaceId: active.id, slug: p.slug, isNew: false }),
+          };
+        })
+      : [];
+    return [...nav, ...ws, ...postItems];
+  }, [t, theme, update, navigate, workspaces, setActive, active, posts]);
+
+  const q = query.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    const matches = q
+      ? allItems.filter(item =>
+          item.label.toLowerCase().includes(q) ||
+          item.group.toLowerCase().includes(q) ||
+          (item.hint?.toLowerCase().includes(q) ?? false))
+      : allItems;
+    const text = query.trim();
+    if (!text || !active) return matches;
+    // Anything typed can be captured as a post idea for the active workspace.
+    const capture: PaletteItem = {
+      id: 'idea-capture',
+      group: t('palette.groups.ideas'),
+      label: t('palette.saveIdea', { text }),
+      hint: active.name,
+      icon: <IconBulb size={15} />,
       action: () => {
-        setActive(w.id);
-        navigate({ page: 'workspace' });
-        close();
+        void useIdeas.getState().add(active.mdxPath, { title: text })
+          .then(() => toast.success(t('ideas.added'), text));
       },
     };
-  });
+    return [...matches, capture];
+  }, [allItems, q, query, active, t]);
 
-  const postItems: PaletteItem[] = active
-    ? postSlugs.map(slug => ({
-        id: `post-${slug}`,
-        group: 'Posts',
-        label: slug,
-        hint: active.name,
-        type: 'post',
-        action: () => {
-          navigate({ page: 'editor', workspaceId: active.id, slug, isNew: false });
-          close();
-        },
-      }))
-    : [];
+  const groups = useMemo(() => {
+    const out: { name: string; items: (PaletteItem & { idx: number })[] }[] = [];
+    filtered.forEach((item, idx) => {
+      let g = out.find(g => g.name === item.group);
+      if (!g) { g = { name: item.group, items: [] }; out.push(g); }
+      g.items.push({ ...item, idx });
+    });
+    return out;
+  }, [filtered]);
 
-  const allItems = [...navItems, ...workspaceItems, ...postItems];
+  const run = useCallback((item: PaletteItem | undefined) => {
+    if (!item) return;
+    item.action();
+    close();
+  }, [close]);
 
-  /* Filter */
-  const q = query.trim().toLowerCase();
-  const filtered = q
-    ? allItems.filter(item =>
-        item.label.toLowerCase().includes(q) ||
-        item.group.toLowerCase().includes(q) ||
-        (item.hint?.toLowerCase().includes(q) ?? false)
-      )
-    : allItems;
-
-  /* Build groups */
-  const groups: { name: string; items: (PaletteItem & { flatIdx: number })[] }[] = [];
-  let counter = 0;
-  for (const item of filtered) {
-    let g = groups.find(g => g.name === item.group);
-    if (!g) { g = { name: item.group, items: [] }; groups.push(g); }
-    g.items.push({ ...item, flatIdx: counter++ });
-  }
-  const totalItems = counter;
-
-  /* Keyboard navigation */
   useEffect(() => {
     if (!open) return;
+    const total = Math.max(filtered.length, 1);
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { close(); return; }
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelected(s => (s + 1) % Math.max(totalItems, 1));
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelected(s => (s - 1 + Math.max(totalItems, 1)) % Math.max(totalItems, 1));
-      }
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        filtered[selected]?.action();
-      }
+      if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSelected(s => (s + 1) % total); }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); setSelected(s => (s - 1 + total) % total); }
+      if (e.key === 'Enter')     { e.preventDefault(); run(filtered[selected]); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [open, filtered, selected, totalItems, close]);
+  }, [open, filtered, selected, close, run]);
 
-  /* Scroll selected item into view */
   useEffect(() => {
-    if (!resultsRef.current) return;
-    const el = resultsRef.current.querySelector(`[data-idx="${selected}"]`);
-    el?.scrollIntoView({ block: 'nearest' });
+    resultsRef.current?.querySelector(`[data-idx="${selected}"]`)?.scrollIntoView({ block: 'nearest' });
   }, [selected]);
 
-  /* Reset selection when query changes */
   useEffect(() => { setSelected(0); }, [query]);
 
   if (!open) return null;
 
   return (
-    <>
-      {/* Backdrop */}
+    <div className="modal-overlay" style={{ alignItems: 'flex-start', paddingTop: '14vh', zIndex: 100 }} onMouseDown={close}>
       <div
-        className="fixed inset-0"
-        style={{ background: 'rgba(0,0,0,0.32)', zIndex: 100 }}
-        onClick={close}
-      />
-
-      {/* Palette sheet */}
-      <div
-        className="fixed left-1/2 flex flex-col overflow-hidden"
-        style={{
-          top: '18%',
-          transform: 'translateX(-50%)',
-          width: 560,
-          maxHeight: '62vh',
-          zIndex: 101,
-          background: 'var(--bg)',
-          border: '1px solid var(--border-2)',
-          borderRadius: 8,
-          boxShadow: '0 10px 28px rgba(0,0,0,0.16)',
-          animation: 'palette-in 0.16s cubic-bezier(0.32,0.72,0,1) both',
-        }}
+        className="modal mac-sheet flex flex-col"
+        style={{ width: 'min(600px, 100%)', maxHeight: '64vh' }}
         role="dialog"
-        aria-label="Command palette"
+        aria-label={t('palette.label')}
         aria-modal="true"
+        onMouseDown={e => e.stopPropagation()}
       >
-        <style>{`
-          @keyframes palette-in {
-            from { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.97); }
-            to   { opacity: 1; transform: translateX(-50%) translateY(0)     scale(1);    }
-          }
-          @media (prefers-reduced-motion: reduce) {
-            @keyframes palette-in {
-              from { opacity: 0; }
-              to   { opacity: 1; }
-            }
-          }
-        `}</style>
-
-        {/* Search row */}
-        <div
-          className="flex items-center gap-2.5 px-4 flex-shrink-0"
-          style={{ height: 50, borderBottom: '1px solid var(--border)', color: 'var(--text-faint)' }}
-        >
-          <IconSearch />
+        <div className="flex items-center gap-3 px-4 flex-shrink-0" style={{ height: 56, borderBottom: '1px solid var(--border)', color: 'var(--accent)' }}>
+          <IconSearch size={18} />
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search commands, workspaces, posts…"
+            placeholder={t('palette.placeholder')}
             className="flex-1 bg-transparent outline-none"
-            style={{ fontSize: '14px', color: 'var(--text)', caretColor: 'var(--accent)' }}
-            aria-label="Search"
-            aria-autocomplete="list"
+            style={{ fontSize: 15, color: 'var(--text)', caretColor: 'var(--accent)', outline: 'none' }}
+            aria-label={t('palette.label')}
             autoComplete="off"
             spellCheck={false}
           />
-          <kbd
-            className="text-[10px] px-1.5 py-0.5"
-            style={{
-              fontFamily: "'Courier New', monospace",
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border-2)',
-              color: 'var(--text-faint)',
-            }}
-          >
-            esc
-          </kbd>
+          <kbd>esc</kbd>
         </div>
 
-        {/* Results */}
-        <div ref={resultsRef} className="overflow-y-auto flex-1 py-1">
+        <div ref={resultsRef} className="overflow-y-auto flex-1 p-2">
           {groups.length === 0 && (
-            <div className="flex items-center justify-center py-12">
-              <p className="text-[13px]" style={{ color: 'var(--text-muted)' }}>
-                No results{query ? ` for "${query}"` : ''}
-              </p>
+            <div className="empty-state" style={{ padding: '36px 20px' }}>
+              <div className="text-[28px]">🔍</div>
+              <p className="text-[13px]" style={{ color: 'var(--text-muted)' }}>{t('palette.noResults', { query })}</p>
             </div>
           )}
 
           {groups.map(group => (
-            <div key={group.name}>
-              <p
-                className="px-4 pt-2.5 pb-1 text-[11px] font-medium"
-                style={{ color: 'var(--text-muted)', marginBottom: '2px' }}
-              >
+            <div key={group.name} className="mb-1">
+              <p className="px-3 pt-2 pb-1 text-[11px] font-bold uppercase" style={{ color: 'var(--text-faint)', letterSpacing: '0.06em' }}>
                 {group.name}
               </p>
-              {group.items.map(item => (
-                <div key={item.id} data-idx={item.flatIdx}>
-                  <PaletteRow
-                    item={item}
-                    selected={item.flatIdx === selected}
-                    onMouseEnter={() => setSelected(item.flatIdx)}
-                  />
-                </div>
-              ))}
+              {group.items.map(item => {
+                const isSel = item.idx === selected;
+                return (
+                  <button
+                    key={item.id}
+                    data-idx={item.idx}
+                    onClick={() => run(item)}
+                    onMouseMove={() => { if (!isSel) setSelected(item.idx); }}
+                    className="w-full flex items-center gap-3 px-3 text-start"
+                    style={{
+                      height: 40,
+                      borderRadius: 10,
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: isSel ? 'var(--accent-faint)' : 'transparent',
+                      color: isSel ? 'var(--accent)' : 'var(--text)',
+                    }}
+                  >
+                    <span className="w-6 flex items-center justify-center flex-shrink-0" style={{ color: isSel ? 'var(--accent)' : 'var(--text-faint)' }}>
+                      {item.icon}
+                    </span>
+                    <span className="flex-1 text-[13.5px] truncate" style={{ fontWeight: isSel ? 650 : 500 }} dir="auto">{item.label}</span>
+                    {item.hint && (
+                      <span className="text-[11px] mac-input-mono flex-shrink-0 truncate max-w-[180px]" style={{ color: 'var(--text-faint)' }}>
+                        {item.hint}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           ))}
         </div>
 
-        {/* Footer hints */}
-        <div
-          className="flex items-center gap-4 px-4 py-2 flex-shrink-0"
-          style={{ borderTop: '1px solid var(--border)' }}
-        >
-          {[
-            { key: '↑↓', label: 'navigate' },
-            { key: '↵',  label: 'open' },
-            { key: '⌘K', label: 'toggle' },
-          ].map(({ key, label }) => (
-            <span key={key} className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-faint)', fontFamily: "'Courier New', monospace" }}>
-              <kbd>{key}</kbd>
-              {label}
-            </span>
-          ))}
+        <div className="flex items-center gap-4 px-4 py-2.5 flex-shrink-0 text-[11px]" style={{ borderTop: '1px solid var(--border)', color: 'var(--text-faint)', background: 'var(--surface)' }}>
+          <span className="flex items-center gap-1.5"><kbd>↑</kbd><kbd>↓</kbd>{t('palette.navigate')}</span>
+          <span className="flex items-center gap-1.5"><kbd>↵</kbd>{t('palette.open')}</span>
+          <span className="flex items-center gap-1.5"><kbd>{MOD}K</kbd>{t('palette.toggle')}</span>
         </div>
       </div>
-    </>
+    </div>
   );
 }
