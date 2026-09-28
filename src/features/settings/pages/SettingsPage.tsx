@@ -3,11 +3,13 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from '../../../router';
 import {
-  EDITOR_FONT,
+  ARABIC_FONT_FAMILY,
+  editorFontFamily,
   EDITOR_FONT_SIZE,
   EDITOR_LINE_HEIGHT,
   useSettings,
   type AutoSaveInterval,
+  type ArabicFont,
   type EditorFont,
   type EditorFontSize,
   type EditorLineHeight,
@@ -29,6 +31,7 @@ function snapshotSettings(settings: Settings): Settings {
     editorFontSize: settings.editorFontSize,
     editorLineHeight: settings.editorLineHeight,
     language: settings.language,
+    arabicFont: settings.arabicFont,
     autoSave: settings.autoSave,
     autoSaveInterval: settings.autoSaveInterval,
   };
@@ -49,6 +52,7 @@ export function SettingsPage() {
     settings.editorFontSize,
     settings.editorLineHeight,
     settings.language,
+    settings.arabicFont,
     settings.autoSave,
     settings.autoSaveInterval,
   ]);
@@ -112,6 +116,12 @@ export function SettingsPage() {
     { value: 'fr', label: t('settings.languages.fr') },
   ];
 
+  const ARABIC_FONTS: OptionItem<ArabicFont>[] = [
+    { value: 'noto-sans-arabic', label: 'Noto Sans Arabic' },
+    { value: 'cairo', label: 'Cairo' },
+    { value: 'readex-pro', label: 'Readex Pro' },
+  ];
+
   const INTERVALS: OptionItem<AutoSaveInterval>[] = [
     { value: 3000,  label: t('settings.intervals.3s') },
     { value: 5000,  label: t('settings.intervals.5s') },
@@ -166,6 +176,16 @@ export function SettingsPage() {
             <Row label={t('settings.language')} hint={t('settings.languageHint')}>
               <SettingsSelect options={LANGUAGES} value={draft.language} onChange={v => set('language', v)} />
             </Row>
+            {draft.language === 'ar' && (
+              <Row label={t('settings.arabicFont')} hint={t('settings.arabicFontHint')}>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <SettingsSelect options={ARABIC_FONTS} value={draft.arabicFont} onChange={v => set('arabicFont', v)} />
+                  <span lang="ar" dir="rtl" style={{ fontFamily: ARABIC_FONT_FAMILY[draft.arabicFont], fontSize: 17 }}>
+                    العربية بخط جميل
+                  </span>
+                </div>
+              </Row>
+            )}
           </Section>
 
           <Section title={t('settings.editor')}>
@@ -317,7 +337,7 @@ function EditorPreview({ draft, label }: { draft: Settings; label: string }) {
           border: '1px solid var(--border)',
           borderRadius: 12,
           background: 'var(--surface)',
-          fontFamily: EDITOR_FONT[draft.editorFont],
+          fontFamily: editorFontFamily(draft.editorFont, draft.arabicFont),
           fontSize: EDITOR_FONT_SIZE[draft.editorFontSize],
           lineHeight: EDITOR_LINE_HEIGHT[draft.editorLineHeight],
           color: 'var(--text)',

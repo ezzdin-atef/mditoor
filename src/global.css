@@ -1,5 +1,33 @@
 @import "tailwindcss";
 
+/* Arabic-only faces keep Latin text in the user's chosen UI or editor font. */
+@font-face {
+  font-family: 'Mditoor Noto Arabic';
+  src: url('@fontsource-variable/noto-sans-arabic/files/noto-sans-arabic-arabic-wght-normal.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  unicode-range: U+0600-08FF, U+FB50-FDFF, U+FE70-FEFF, U+10E60-10E7F, U+10EC0-10EFF, U+1EE00-1EEFF;
+}
+
+@font-face {
+  font-family: 'Mditoor Cairo Arabic';
+  src: url('@fontsource-variable/cairo/files/cairo-arabic-wght-normal.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 200 1000;
+  font-display: swap;
+  unicode-range: U+0600-08FF, U+FB50-FDFF, U+FE70-FEFF, U+10E60-10E7F, U+10EC0-10EFF, U+1EE00-1EEFF;
+}
+
+@font-face {
+  font-family: 'Mditoor Readex Arabic';
+  src: url('@fontsource-variable/readex-pro/files/readex-pro-arabic-wght-normal.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 160 700;
+  font-display: swap;
+  unicode-range: U+0600-08FF, U+FB50-FDFF, U+FE70-FEFF, U+10E60-10E7F, U+10EC0-10EFF, U+1EE00-1EEFF;
+}
+
 /* ════════════════════════════════════════════════
    MDITOOR — "Studio" design system
    Soft, bright surfaces · violet → coral accent · rounded, friendly shapes
@@ -7,6 +35,7 @@
 
 /* ─── Light mode ─── */
 :root {
+  --arabic-font: 'Mditoor Noto Arabic';
   --app-bg:       #f2f5f6;
   --bg:           #ffffff;
   --surface:      #f6f8f9;
@@ -132,13 +161,19 @@ body {
   margin: 0;
   background: var(--app-bg);
   color: var(--text);
-  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    'Segoe UI', 'Noto Sans', 'Noto Sans Arabic', sans-serif;
+  font-family: 'Inter', var(--arabic-font), ui-sans-serif, system-ui,
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* App language controls UI typography; document content keeps its own font setting. */
+html[lang="ar"] body {
+  font-family: var(--arabic-font), 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: normal;
 }
 
 button { font-family: inherit; }

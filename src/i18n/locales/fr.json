@@ -221,6 +221,8 @@
     "preview": "Aperçu",
     "language": "Langue",
     "languageHint": "Langue de l'application",
+    "arabicFont": "Police arabe",
+    "arabicFontHint": "Police utilisée pour le texte arabe dans l'application et l'éditeur",
     "autoSave": "Sauvegarde auto",
     "autoSaveHint": "Sauvegarder automatiquement les modifications",
     "autoSaveInterval": "Intervalle de sauvegarde",

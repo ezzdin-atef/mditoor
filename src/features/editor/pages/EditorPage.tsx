@@ -6,7 +6,7 @@ import { pickImageFile, uploadImage } from '../../assets/imageUpload';
 import { useRouter, type Route } from '../../../router';
 import { useStore } from '../../workspace/store';
 import {
-  EDITOR_FONT,
+  editorFontFamily,
   EDITOR_FONT_SIZE,
   EDITOR_LINE_HEIGHT,
   useSettings,
@@ -234,7 +234,7 @@ function EditorScreen({ route }: { route: EditorRoute }) {
   }, [dirty, loading, save, saving, settings.autoSave, settings.autoSaveInterval]);
 
   const editorStyle = {
-    fontFamily: EDITOR_FONT[settings.editorFont],
+    fontFamily: editorFontFamily(settings.editorFont, settings.arabicFont),
     fontSize:   EDITOR_FONT_SIZE[settings.editorFontSize],
     lineHeight: EDITOR_LINE_HEIGHT[settings.editorLineHeight],
   };

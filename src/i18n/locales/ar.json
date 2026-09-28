@@ -221,6 +221,8 @@
     "preview": "معاينة",
     "language": "اللغة",
     "languageHint": "لغة التطبيق",
+    "arabicFont": "الخط العربي",
+    "arabicFontHint": "الخط المستخدم للنص العربي في التطبيق والمحرر",
     "autoSave": "الحفظ التلقائي",
     "autoSaveHint": "حفظ التغييرات تلقائياً",
     "autoSaveInterval": "فترة الحفظ",

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from './router';
-import { applyTheme, useSettings, type Settings } from './features/settings/store';
+import { applyTheme, ARABIC_FONT_FAMILY, useSettings, type Settings } from './features/settings/store';
 import { useStore, type StoredWorkspace } from './features/workspace/store';
 import { WorkspacePage } from './features/workspace/pages/WorkspacePage';
 import { EditorPage } from './features/editor/pages/EditorPage';
@@ -28,13 +28,14 @@ function useThemeSync() {
 }
 
 function useLanguageSync() {
-  const { language } = useSettings();
+  const { language, arabicFont } = useSettings();
   useEffect(() => {
     i18n.changeLanguage(language);
     const rtl = isRtlLanguage(language as AppLanguage);
     document.documentElement.setAttribute('dir', rtl ? 'rtl' : 'ltr');
     document.documentElement.setAttribute('lang', language);
-  }, [language]);
+    document.documentElement.style.setProperty('--arabic-font', ARABIC_FONT_FAMILY[arabicFont]);
+  }, [language, arabicFont]);
 }
 
 function useHydrateFromDisk() {

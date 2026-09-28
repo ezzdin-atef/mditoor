@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mditoor &mdash; The Markdown studio for developers who blog</title>
+  <meta name="description" content="Mditoor is a free, local-first desktop app for developer blogs: write Markdown and MDX posts, manage ideas, compress images, and publish across all your sites and repos, with git built in." />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#f2f5f6" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0b1115" media="(prefers-color-scheme: dark)" />
+  <meta property="og:title" content="Mditoor &mdash; The Markdown studio for developers who blog" />
+  <meta property="og:description" content="Posts, ideas, images, and git for every blog you run, in one desktop app. Plain .md and .mdx files in your repos." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Arabic:wght@400;600;700&display=swap" />
+  <link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/">
+        <img src="/assets/logo.svg" alt="" width="34" height="34" />
+        <span><span class="brand-name">Mditoor</span><br /><span class="brand-tag">MDX content studio</span></span>
+      </a>
+      <nav class="nav" aria-label="Main">
+        <a class="mac-btn mac-btn-ghost nav-hide" href="#features">Features</a>
+        <a class="mac-btn mac-btn-ghost nav-hide" href="#frameworks">Frameworks</a>
+        <a class="mac-btn mac-btn-ghost nav-hide" href="https://github.com/ezzdin-atef/mditoor">GitHub</a>
+        <a class="mac-btn mac-btn-primary" href="/download">Download</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="wrap">
+        <a class="badge badge-accent" href="/download" data-release-badge>Free &amp; open source &middot; Windows installer available</a>
+        <h1>The Markdown studio for developers who <em>blog</em>.</h1>
+        <p class="lede">Write posts, capture ideas, compress images, and publish to every site you run &mdash; from one desktop app. Mditoor works on the plain <code>.md</code> and <code>.mdx</code> files in your repos, with git built in.</p>
+        <div class="cta-row">
+          <a class="mac-btn mac-btn-primary mac-btn-lg" href="/download">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M3 13.5h10"/></svg>
+            Download for Windows
+          </a>
+          <a class="mac-btn mac-btn-lg" href="https://github.com/ezzdin-atef/mditoor">
+            <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+            Star on GitHub
+          </a>
+        </div>
+        <div class="hero-meta">
+          <span class="chip">~4 MB installer</span>
+          <span class="chip">No account</span>
+          <span class="chip">No telemetry</span>
+          <span class="chip">MIT licensed</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive replica of the app. Click the workspaces and tabs. -->
+    <div class="showcase">
+      <div class="wrap">
+        <figure class="window" data-mock aria-label="Interactive preview of the Mditoor desktop app">
+          <div class="titlebar" aria-hidden="true">
+            <img src="/assets/logo.svg" alt="" />
+            <span class="titlebar-title" data-mock-title>Mditoor &mdash; Personal blog</span>
+            <span class="titlebar-controls">
+              <span><svg viewBox="0 0 10 10"><path d="M0 5h10" stroke="currentColor"/></svg></span>
+              <span><svg viewBox="0 0 10 10"><rect x=".5" y=".5" width="9" height="9" fill="none" stroke="currentColor"/></svg></span>
+              <span><svg viewBox="0 0 10 10"><path d="M0 0l10 10M10 0 0 10" stroke="currentColor"/></svg></span>
+            </span>
+          </div>
+          <div class="app-shell">
+            <aside class="app-sidebar">
+              <div class="sb-brand">
+                <img src="/assets/logo.svg" alt="" />
+                <div><b>Mditoor</b><small>MDX content studio</small></div>
+              </div>
+              <div class="search-trigger" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg>
+                <span>Search or jump to&hellip;</span><kbd>Ctrl K</kbd>
+              </div>
+              <div class="sb-scroll">
+                <div class="label-caps">Workspaces</div>
+                <button class="sb-item selected" type="button" data-ws="0"><span class="ws-icon">📝</span><span class="name">Personal blog</span></button>
+                <button class="sb-item" type="button" data-ws="1"><span class="ws-icon">📚</span><span class="name">Docs site</span></button>
+                <button class="sb-item" type="button" data-ws="2"><span class="ws-icon">🏢</span><span class="name">Company blog</span></button>
+                <div class="sb-item new" aria-hidden="true"><span class="ws-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg></span><span class="name">New Workspace</span></div>
+              </div>
+              <div class="sb-foot" aria-hidden="true">
+                <div class="sb-item"><span class="ws-icon" style="background:transparent"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg></span><span class="name">Settings</span><kbd>Ctrl ,</kbd></div>
+              </div>
+            </aside>
+
+            <div class="app-main">
+              <header class="page-header">
+                <div class="page-head-row">
+                  <span class="ws-icon ws-icon-lg" data-mock-icon aria-hidden="true">📝</span>
+                  <div style="min-width:0">
+                    <h2 class="page-title" data-mock-name>Personal blog</h2>
+                    <p class="page-path" data-mock-path>~/code/my-site/content/posts</p>
+                  </div>
+                  <span class="mac-btn mac-btn-primary" aria-hidden="true">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>New Post
+                  </span>
+                </div>
+                <div class="tab-strip" role="tablist" aria-label="Workspace views">
+                  <button class="app-tab" role="tab" type="button" aria-selected="true" aria-controls="pane-posts" data-tab="posts">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h5.5L12 4.5V14H4zM6 7.5h4M6 10h4"/></svg>Posts<span class="tab-count" data-mock-count>6</span>
+                  </button>
+                  <button class="app-tab" role="tab" type="button" aria-selected="false" aria-controls="pane-ideas" data-tab="ideas">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2a4 4 0 0 0-2.3 7.3V11h4.6V9.3A4 4 0 0 0 8 2zM6 13.5h4"/></svg>Ideas<span class="tab-count">5</span>
+                  </button>
+                  <button class="app-tab" role="tab" type="button" aria-selected="false" aria-controls="pane-meta" data-tab="meta">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 6h6M5 8.5h6M5 11h3"/></svg>Metadata<span class="tab-count">5</span>
+                  </button>
+                  <button class="app-tab" role="tab" type="button" aria-selected="false" aria-controls="pane-images" data-tab="images">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="2"/><circle cx="6" cy="6.5" r="1.2"/><path d="m2 11 3.5-3 3 2.5 2-1.5L14 12"/></svg>Images
+                  </button>
+                  <button class="app-tab" role="tab" type="button" aria-selected="false" aria-controls="pane-git" data-tab="git">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="4.5" cy="3.5" r="1.5"/><circle cx="4.5" cy="12.5" r="1.5"/><circle cx="11.5" cy="5.5" r="1.5"/><path d="M4.5 5v6M11.5 7c0 2.5-3 3-7 4"/></svg>Git<span class="tab-count attention">3</span>
+                  </button>
+                </div>
+              </header>
+
+              <div class="page-body">
+                <!-- Posts -->
+                <div class="tab-pane active" id="pane-posts" role="tabpanel">
+                  <div class="toolbar-row">
+                    <div class="search-field"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg>Search posts&hellip;</div>
+                    <div class="mac-segmented"><span class="mac-segment active">Gallery</span><span class="mac-segment">List</span></div>
+                  </div>
+                  <div class="post-grid">
+                    <article class="post-card"><div class="post-cover" style="background:#0d8f86">SR<span class="glass-badge">Published</span></div><div class="post-card-body"><h3 class="post-card-title">Shipping React Server Components to prod</h3><p class="post-card-excerpt">What broke, what got faster, and the caching bug that cost us a weekend.</p><div class="post-card-meta"><span>Sep 24</span><span>8 min read</span></div></div></article>
+                    <article class="post-card"><div class="post-cover" style="background:#d9663f">RT<span class="glass-badge draft">Draft</span></div><div class="post-card-body"><h3 class="post-card-title">Rust traits for TypeScript developers</h3><p class="post-card-excerpt">Interfaces, generics and the borrow checker, mapped to things you already know.</p><div class="post-card-meta"><span>Edited 2h ago</span><span>5 min read</span></div></div></article>
+                    <article class="post-card"><div class="post-cover" style="background:#2f78c4">PG<span class="glass-badge">Published</span></div><div class="post-card-body"><h3 class="post-card-title">Postgres indexes I actually use</h3><p class="post-card-excerpt">Partial, covering and BRIN indexes with real query plans from a side project.</p><div class="post-card-meta"><span>Sep 12</span><span>11 min read</span></div></div></article>
+                    <article class="post-card"><div class="post-cover" style="background:#5b6fb8">FO<span class="glass-badge">Published</span></div><div class="post-card-body"><h3 class="post-card-title">Self-hosting web fonts the right way</h3><p class="post-card-excerpt">Subsetting, preload, and font-display without the layout shift.</p><div class="post-card-meta"><span>Aug 30</span><span>4 min read</span></div></div></article>
+                    <article class="post-card"><div class="post-cover" style="background:#c28a12">نص<span class="glass-badge draft">Draft</span></div><div class="post-card-body"><h3 class="post-card-title" dir="rtl">مقدمة إلى Docker للمطورين</h3><p class="post-card-excerpt" dir="rtl">شرح عملي للحاويات من الصفر.</p><div class="post-card-meta"><span>Edited yesterday</span><span>6 min read</span></div></div></article>
+                    <article class="post-card"><div class="post-cover" style="background:#3f9a5c">CI<span class="glass-badge">Published</span></div><div class="post-card-body"><h3 class="post-card-title">A 40-line GitHub Actions cache that works</h3><p class="post-card-excerpt">Stop reinstalling node_modules on every push.</p><div class="post-card-meta"><span>Aug 18</span><span>3 min read</span></div></div></article>
+                  </div>
+                </div>
+
+                <!-- Ideas -->
+                <div class="tab-pane" id="pane-ideas" role="tabpanel">
+                  <div class="idea-capture">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M9 1 3 9h4l-1 6 6-8H8z"/></svg>
+                    <span>What could you write about? Jot it down&hellip;</span>
+                    <span class="mac-btn mac-btn-primary">Add</span>
+                  </div>
+                  <div class="idea-board">
+                    <div class="idea-column">
+                      <div class="idea-column-header"><i class="status-pip" style="background:var(--text-faint)"></i>Inbox<span class="tab-count">3</span></div>
+                      <div class="idea-card"><p class="idea-card-title">Benchmarks: Bun vs Node for CLI tools</p><div class="idea-card-footer"><span>2d ago</span><span class="star">★</span></div></div>
+                      <div class="idea-card"><p class="idea-card-title">My dotfiles, explained</p><p class="idea-card-notes">zsh, tmux, neovim config tour</p><div class="idea-card-footer"><span>5d ago</span><span class="write">Write &rarr;</span></div></div>
+                      <div class="idea-card"><p class="idea-card-title">Feature flags without a vendor</p><div class="idea-card-footer"><span>1w ago</span></div></div>
+                    </div>
+                    <div class="idea-column">
+                      <div class="idea-column-header"><i class="status-pip" style="background:var(--accent-3)"></i>Up next<span class="tab-count">2</span></div>
+                      <div class="idea-card"><p class="idea-card-title">Debugging memory leaks in Node</p><p class="idea-card-notes">heap snapshots, the event listener one</p><div class="idea-card-footer"><span>Yesterday</span><span class="write">Write &rarr;</span></div></div>
+                      <div class="idea-card"><p class="idea-card-title">SQLite is enough</p><div class="idea-card-footer"><span>3d ago</span><span class="star">★</span></div></div>
+                    </div>
+                    <div class="idea-column">
+                      <div class="idea-column-header"><i class="status-pip" style="background:var(--green)"></i>Drafted<span class="tab-count">1</span></div>
+                      <div class="idea-card"><p class="idea-card-title">Rust traits for TypeScript developers</p><div class="idea-card-footer"><span>Draft created</span><span class="badge badge-green">Drafted</span></div></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Metadata -->
+                <div class="tab-pane" id="pane-meta" role="tabpanel">
+                  <div class="field-list">
+                    <div class="field-row"><span class="grip">⋮⋮</span><b>title</b><span class="req">required</span><span class="badge">text</span></div>
+                    <div class="field-row"><span class="grip">⋮⋮</span><b>date</b><span class="req">required</span><span class="badge badge-yellow">date</span></div>
+                    <div class="field-row"><span class="grip">⋮⋮</span><b>status</b><span class="badge badge-purple">select</span></div>
+                    <div class="field-row"><span class="grip">⋮⋮</span><b>tags</b><span class="badge badge-pink">tags</span></div>
+                    <div class="field-row"><span class="grip">⋮⋮</span><b>cover</b><span class="badge badge-pink">image</span></div>
+                  </div>
+                </div>
+
+                <!-- Images -->
+                <div class="tab-pane" id="pane-images" role="tabpanel">
+                  <div class="image-layout">
+                    <div class="image-grid">
+                      <div class="image-card"><div class="image-thumb" style="background:linear-gradient(135deg,#0d8f86,#2f78c4)"><span class="badge">WEBP</span></div><div class="image-meta"><b>rsc-cover.webp</b><span>184 KB</span></div></div>
+                      <div class="image-card"><div class="image-thumb" style="background:linear-gradient(135deg,#d9663f,#c28a12)"><span class="badge">JPG</span></div><div class="image-meta"><b>rust-traits.jpg</b><span>212 KB</span></div></div>
+                      <div class="image-card"><div class="image-thumb" style="background:linear-gradient(135deg,#5b6fb8,#c2566b)"><span class="badge">PNG</span></div><div class="image-meta"><b>query-plan.png</b><span>96 KB</span></div></div>
+                      <div class="image-card"><div class="image-thumb" style="background:linear-gradient(135deg,#3f9a5c,#4f7f8c)"><span class="badge">JPG</span></div><div class="image-meta"><b>ci-graph.jpg</b><span>141 KB</span></div></div>
+                      <div class="image-card"><div class="image-thumb" style="background:linear-gradient(135deg,#4f7f8c,#0d8f86)"><span class="badge">WEBP</span></div><div class="image-meta"><b>docker-101.webp</b><span>77 KB</span></div></div>
+                      <div class="image-card"><div class="image-thumb" style="background:var(--surface-2)"><span class="badge" style="background:var(--orange)">Unused</span></div><div class="image-meta"><b>old-banner.png</b><span>1.2 MB</span></div></div>
+                    </div>
+                    <div class="panel">
+                      <div class="panel-header"><div><p class="panel-title">Optimize on import</p><p class="panel-subtitle">Applied to every new image</p></div><span class="mac-toggle" aria-hidden="true"></span></div>
+                      <div class="panel-body">
+                        <div class="opt-row"><span>Max width</span><b>2000px</b></div>
+                        <div class="opt-row"><span>Quality</span><b>82</b></div>
+                        <div class="opt-row"><span>Sharpen</span><b>On</b></div>
+                        <div class="saving">Last import<b>4.8 MB &rarr; 312 KB</b><div class="meter"><i></i></div></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Git -->
+                <div class="tab-pane" id="pane-git" role="tabpanel">
+                  <div class="git-layout">
+                    <div>
+                      <div class="git-hero"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="4.5" cy="3.5" r="1.5"/><circle cx="4.5" cy="12.5" r="1.5"/><path d="M4.5 5v6"/></svg><b>main</b><span class="badge badge-accent">&uarr; 1 to push</span></div>
+                      <div class="git-section-title"><span>Changes</span><span>3</span></div>
+                      <div class="git-file selected"><span class="status-dot m">M</span><span class="path">rust-traits/index.mdx</span><span class="diffstat"><span class="add">+42</span><span class="del">-6</span></span></div>
+                      <div class="git-file"><span class="status-dot a">A</span><span class="path">rust-traits/cover.webp</span></div>
+                      <div class="git-file"><span class="status-dot m">M</span><span class="path">.mditoor-ideas.json</span><span class="diffstat"><span class="add">+3</span><span class="del">-1</span></span></div>
+                      <div class="commit-box"><p>post: Rust traits for TypeScript devs</p><div><span class="mac-btn">Commit</span><span class="mac-btn mac-btn-primary">Commit &amp; push</span></div></div>
+                    </div>
+                    <div class="diff-view">
+                      <div class="diff-head"><span>rust-traits/index.mdx</span><span class="diffstat"><span class="add">+42</span><span class="del">-6</span></span></div>
+                      <div class="diff-line ctx"> ---</div>
+                      <div class="diff-line ctx"> title: Rust traits for TypeScript developers</div>
+                      <div class="diff-line del">-status: idea</div>
+                      <div class="diff-line add">+status: draft</div>
+                      <div class="diff-line add">+cover: ./cover.webp</div>
+                      <div class="diff-line ctx"> tags: [rust, typescript]</div>
+                      <div class="diff-line ctx"> ---</div>
+                      <div class="diff-line add">+## Traits are interfaces with superpowers</div>
+                      <div class="diff-line add">+If you've used `implements` in TypeScript,</div>
+                      <div class="diff-line add">+you already know half of this.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </figure>
+      </div>
+    </div>
+
+    <section class="section" id="features">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="label-caps">One app, the whole workflow</span>
+          <h2>From idea to published post, without the tab juggling.</h2>
+          <p>Mditoor sits on top of the repos you already have. No CMS, no database, no lock-in &mdash; just a better way to work with your content.</p>
+        </div>
+
+        <div class="pillars">
+          <article class="pillar">
+            <div class="pillar-copy">
+              <div class="pillar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6zM9 12h6M9 16h6"/></svg></div>
+              <h3>Blog posts, managed like a CMS</h3>
+              <p>Browse every post as a gallery or list, see drafts at a glance, and write in a block editor or raw Markdown. Frontmatter becomes a real form with dates, selects, tags and image pickers.</p>
+              <ul class="checks">
+                <li>Block editor with slash menu, code blocks, tables and callouts</li>
+                <li>Custom frontmatter fields per workspace, YAML or TOML</li>
+                <li>SEO checks before you publish</li>
+              </ul>
+            </div>
+            <div class="pillar-demo">
+              <div class="editor-demo">
+                <div class="doc">
+                  <h4>Traits are interfaces with superpowers</h4>
+                  <p>If you've used <code>implements</code> in TypeScript, you already know half of this.</p>
+                  <div class="code"><span class="k">trait</span> Summary { <span class="k">fn</span> summarize(&amp;self) -&gt; String; }</div>
+                  <p dir="rtl">وتكتب بالعربية في نفس المقال، والاتجاه يُضبط تلقائياً.<span class="caret"></span></p>
+                </div>
+                <div class="side">
+                  <div><label>title</label><div class="mac-input focus">Rust traits for TS devs</div></div>
+                  <div><label>date <span class="badge badge-yellow">date</span></label><div class="mac-input">2026-09-28</div></div>
+                  <div><label>status <span class="badge badge-purple">select</span></label><div class="mac-input">draft</div></div>
+                  <div><label>tags <span class="badge badge-pink">tags</span></label><div class="tag-pills"><span class="chip">rust</span><span class="chip">typescript</span></div></div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="pillar flip">
+            <div class="pillar-copy">
+              <div class="pillar-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3zM9.5 20h5"/></svg></div>
+              <h3>An ideas board that feeds your drafts</h3>
+              <p>Capture post ideas the moment they show up, move them from Inbox to Up next, and turn any idea into a draft post with one click. Ideas live in your repo next to the posts.</p>
+              <ul class="checks">
+                <li>Quick capture from anywhere with the command palette</li>
+                <li>Star, search and reorder by stage</li>
+                <li>Stored as <code>.mditoor-ideas.json</code>, versioned with git</li>
+              </ul>
+            </div>
+            <div class="pillar-demo">
+              <div class="idea-board" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+                <div class="idea-column">
+                  <div class="idea-column-header"><i class="status-pip" style="background:var(--text-faint)"></i>Inbox<span class="tab-count">3</span></div>
+                  <div class="idea-card"><p class="idea-card-title">Benchmarks: Bun vs Node for CLI tools</p><div class="idea-card-footer"><span>2d ago</span><span class="star">★</span></div></div>
+                  <div class="idea-card"><p class="idea-card-title">My dotfiles, explained</p><p class="idea-card-notes">zsh, tmux, neovim config tour</p><div class="idea-card-footer"><span>5d ago</span><span class="write">Write &rarr;</span></div></div>
+                </div>
+                <div class="idea-column">
+                  <div class="idea-column-header"><i class="status-pip" style="background:var(--accent-3)"></i>Up next<span class="tab-count">2</span></div>
+                  <div class="idea-card"><p class="idea-card-title">Debugging memory leaks in Node</p><p class="idea-card-notes">heap snapshots, the event listener one</p><div class="idea-card-footer"><span>Yesterday</span><span class="write">Write &rarr;</span></div></div>
+                  <div class="idea-card"><p class="idea-card-title">SQLite is enough</p><div class="idea-card-footer"><span>3d ago</span><span class="star">★</span></div></div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="pillar">
+            <div class="pillar-copy">
+              <div class="pillar-icon coral"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="8.5" cy="10" r="1.6"/><path d="m3 17 5-4.5 4 3.5 3-2.5 6 5"/></svg></div>
+              <h3>Images compressed before they hit your repo</h3>
+              <p>Drag a screenshot in and Mditoor resizes, compresses and sharpens it on import. The asset gallery shows every image in the workspace and flags the ones no post uses anymore.</p>
+              <ul class="checks">
+                <li>Max width, quality and sharpening per workspace</li>
+                <li>Re-optimize any existing image from the gallery</li>
+                <li>Find and clean up unused images</li>
+              </ul>
+            </div>
+            <div class="pillar-demo">
+              <div class="panel">
+                <div class="panel-header"><div><p class="panel-title">Optimize on import</p><p class="panel-subtitle">Applied to every new image</p></div><span class="mac-toggle" aria-hidden="true"></span></div>
+                <div class="panel-body">
+                  <div class="opt-row"><span>Max width</span><b>2000px</b></div>
+                  <div class="opt-row"><span>Quality</span><b>82</b></div>
+                  <div class="opt-row"><span>Sharpen</span><b>On</b></div>
+                  <div class="saving">screenshot-2026-09-28.png<b>4.8 MB &rarr; 312 KB</b><div class="meter"><i></i></div></div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="pillar flip">
+            <div class="pillar-copy">
+              <div class="pillar-icon indigo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01"/></svg></div>
+              <h3>Every blog you run, every place images live</h3>
+              <p>Add a workspace per repo &mdash; your personal blog, the docs site, the company blog &mdash; and switch between them instantly. Each one picks where its images go: next to the post, a <code>public/</code> folder, or any S3-compatible bucket.</p>
+              <ul class="checks">
+                <li>Unlimited workspaces, each with its own fields and framework preset</li>
+                <li>S3, Cloudflare R2, MinIO and other S3-compatible storage</li>
+                <li>Credentials encrypted on your machine, safe to commit the config</li>
+              </ul>
+            </div>
+            <div class="pillar-demo">
+              <div class="ws-list">
+                <div class="ws-row"><span class="ws-icon">📝</span><div class="meta"><b>Personal blog</b><small>~/code/my-site/content/posts</small></div><span class="badge">Next.js</span></div>
+                <div class="ws-row"><span class="ws-icon">📚</span><div class="meta"><b>Docs site</b><small>~/work/docs/blog</small></div><span class="badge">Docusaurus</span></div>
+                <div class="ws-row"><span class="ws-icon">🏢</span><div class="meta"><b>Company blog</b><small>~/work/www/src/content/blog</small></div><span class="badge">Astro</span></div>
+              </div>
+              <div class="dest">
+                <span class="label-caps">Image storage</span>
+                <div class="mac-segmented"><span class="mac-segment">Next to post</span><span class="mac-segment">public/</span><span class="mac-segment active">S3 bucket</span></div>
+                <p>https://cdn.example.com/blog/rust-traits/cover.webp</p>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="more">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="label-caps">And the rest</span>
+          <h2>Built for how developers actually write.</h2>
+        </div>
+        <div class="feature-grid">
+          <div class="feature-card"><span class="ws-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="15" r="2"/><circle cx="14" cy="8" r="2"/><path d="M6 7v6M14 10c0 2.5-3 3-8 3"/></svg></span><h3>Git built in</h3><p>Status, diffs, stage, commit, pull and push without leaving the post.</p></div>
+          <div class="feature-card"><span class="ws-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="15" height="10" rx="2"/><path d="M6 9h1M9.5 9h1M13 9h1M6.5 12h7"/></svg></span><h3>Command palette</h3><p><kbd>Ctrl</kbd> <kbd>K</kbd> to jump to any post, workspace or action.</p></div>
+          <div class="feature-card"><span class="ws-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h9M3 6l2.5-2.5M3 6l2.5 2.5M17 14H8m9 0-2.5-2.5M17 14l-2.5 2.5"/></svg></span><h3>RTL + LTR writing</h3><p>Direction is detected per block, so Arabic and English mix cleanly in one post.</p></div>
+          <div class="feature-card"><span class="ws-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M3 10h14M10 3c2 2 3 4.5 3 7s-1 5-3 7c-2-2-3-4.5-3-7s1-5 3-7z"/></svg></span><h3>UI in 3 languages</h3><p>English, Arabic and French, with a full right-to-left layout.</p></div>
+          <div class="feature-card"><span class="ws-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="5"/><path d="m13 13 4 4"/></svg></span><h3>SEO panel</h3><p>Title length, description, headings and links checked before you ship.</p></div>
+          <div class="feature-card"><span class="ws-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 3 10l4 6M13 4l4 6-4 6"/></svg></span><h3>MDX friendly</h3><p>Imports and JSX components stay intact. Your files are never rewritten behind your back.</p></div>
+          <div class="feature-card"><span class="ws-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="12" height="8" rx="2"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/></svg></span><h3>Local-first</h3><p>No account, no telemetry, no cloud sync. Only the git and uploads you trigger.</p></div>
+          <div class="feature-card"><span class="ws-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 3 6v5c0 3.5 3 5.5 7 6.5 4-1 7-3 7-6.5V6z"/></svg></span><h3>Tiny and native</h3><p>Built with Tauri and Rust. A ~4 MB installer that starts instantly.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="frameworks">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="label-caps">Framework presets</span>
+          <h2>Works with the site you already have.</h2>
+          <p>Point Mditoor at a repo and it detects the framework, finds the posts folder, and picks sensible defaults. Everything can be changed later.</p>
+        </div>
+        <div class="panel table-panel">
+          <table>
+            <thead><tr><th scope="col">Preset</th><th scope="col">Post file</th><th scope="col">Frontmatter</th><th scope="col">Images</th></tr></thead>
+            <tbody>
+              <tr><td>Next.js</td><td><code>&lt;slug&gt;/index.mdx</code></td><td>YAML</td><td><code>public/images</code></td></tr>
+              <tr><td>Astro</td><td><code>&lt;slug&gt;.md</code></td><td>YAML</td><td>next to the post</td></tr>
+              <tr><td>Hugo</td><td><code>&lt;slug&gt;/index.md</code></td><td>TOML</td><td>next to the post</td></tr>
+              <tr><td>Jekyll</td><td><code>YYYY-MM-DD-&lt;slug&gt;.md</code></td><td>YAML</td><td><code>assets/images</code></td></tr>
+              <tr><td>Docusaurus</td><td><code>&lt;slug&gt;/index.md</code></td><td>YAML</td><td>next to the post</td></tr>
+              <tr><td>Eleventy</td><td><code>&lt;slug&gt;.md</code></td><td>YAML</td><td>next to the post</td></tr>
+              <tr><td>Nuxt Content</td><td><code>&lt;slug&gt;.md</code></td><td>YAML</td><td><code>public/images</code></td></tr>
+              <tr><td>Generic</td><td><code>&lt;slug&gt;/index.mdx</code></td><td>YAML</td><td>next to the post</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">Layout not listed? <a href="https://github.com/ezzdin-atef/mditoor/issues">Open an issue</a> with an example repo.</p>
+      </div>
+    </section>
+
+    <div class="wrap">
+      <section class="final">
+        <img src="/assets/logo.svg" alt="" width="64" height="64" />
+        <h2>Your blog deserves a real writing tool.</h2>
+        <p>Free and open source. Windows installer available now; macOS and Linux build from source.</p>
+        <div class="cta-row">
+          <a class="mac-btn mac-btn-primary mac-btn-lg" href="/download">Download Mditoor</a>
+          <a class="mac-btn mac-btn-lg" href="https://github.com/ezzdin-atef/mditoor#contributing">Contribute</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>&copy; <span data-year>2026</span> Ezzdin Atef &middot; MIT License</span>
+      <nav aria-label="Footer">
+        <a href="/download">Download</a>
+        <a href="https://github.com/ezzdin-atef/mditoor">GitHub</a>
+        <a href="https://github.com/ezzdin-atef/mditoor/releases">Releases</a>
+        <a href="https://github.com/ezzdin-atef/mditoor/issues">Report an issue</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script src="/assets/site.js" defer></script>
+</body>
+</html>

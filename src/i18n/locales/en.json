@@ -221,6 +221,8 @@
     "preview": "Preview",
     "language": "Language",
     "languageHint": "Application language",
+    "arabicFont": "Arabic font",
+    "arabicFontHint": "Font used for Arabic text in the app and editor",
     "autoSave": "Auto-save",
     "autoSaveHint": "Automatically save changes",
     "autoSaveInterval": "Save interval",

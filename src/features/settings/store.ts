@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { AppLanguage } from '../../i18n';
 
 export type Theme = 'light' | 'dark' | 'system';
+export type ArabicFont = 'noto-sans-arabic' | 'cairo' | 'readex-pro';
 export type EditorFont =
   | 'jetbrains-mono'
   | 'fira-code'
@@ -24,6 +25,7 @@ export interface Settings {
   editorFontSize: EditorFontSize;
   editorLineHeight: EditorLineHeight;
   language: AppLanguage;
+  arabicFont: ArabicFont;
   autoSave: boolean;
   autoSaveInterval: AutoSaveInterval;
 }
@@ -42,6 +44,7 @@ const DEFAULTS: Settings = {
   editorFontSize: 'md',
   editorLineHeight: 'comfortable',
   language: 'en',
+  arabicFont: 'noto-sans-arabic',
   autoSave: true,
   autoSaveInterval: 5000,
 };
@@ -99,6 +102,16 @@ export const EDITOR_FONT: Record<EditorFont, string> = {
   'merriweather':   "'Merriweather', serif",
   'georgia':        "Georgia, serif",
 };
+
+export const ARABIC_FONT_FAMILY: Record<ArabicFont, string> = {
+  'noto-sans-arabic': "'Mditoor Noto Arabic'",
+  'cairo': "'Mditoor Cairo Arabic'",
+  'readex-pro': "'Mditoor Readex Arabic'",
+};
+
+export function editorFontFamily(editorFont: EditorFont, arabicFont: ArabicFont): string {
+  return `${ARABIC_FONT_FAMILY[arabicFont]}, ${EDITOR_FONT[editorFont]}`;
+}
 
 export const EDITOR_FONT_SIZE: Record<EditorFontSize, string> = {
   sm: '13px',
