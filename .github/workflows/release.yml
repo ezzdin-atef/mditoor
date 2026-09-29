@@ -36,6 +36,11 @@ jobs:
         with:
           node-version: 20
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -45,7 +50,7 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Install frontend deps
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build and publish release
         uses: tauri-apps/tauri-action@v1
