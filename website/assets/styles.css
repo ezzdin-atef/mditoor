@@ -639,3 +639,19 @@ td:first-child { font-weight: 600; }
 .release-row .date { color: var(--text-muted); font-size: 13px; }
 .release-row a { margin-inline-start: auto; }
 .release-row.empty { color: var(--text-muted); }
+
+/* FAQ */
+.faq { max-width: 780px; margin: 0 auto; display: grid; gap: 10px; }
+.faq details { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-lg); transition: border-color 0.15s ease; }
+.faq details[open] { border-color: var(--accent-soft); }
+.faq summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 18px; cursor: pointer; list-style: none; font-weight: 650; font-size: 15px;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after {
+  content: "+"; flex: none; width: 24px; height: 24px; border-radius: var(--r-xs); display: grid; place-items: center;
+  background: var(--surface-2); color: var(--text-muted); font-weight: 600; transition: transform 0.15s ease;
+}
+.faq details[open] summary::after { content: "\2212"; background: var(--accent-faint); color: var(--accent); }
+.faq details p { margin: 0; padding: 0 18px 16px; color: var(--text-muted); }

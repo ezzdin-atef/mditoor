@@ -3,15 +3,93 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mditoor &mdash; The Markdown studio for developers who blog</title>
-  <meta name="description" content="Mditoor is a free, local-first desktop app for developer blogs: write Markdown and MDX posts, manage ideas, compress images, and publish across all your sites and repos, with git built in." />
+  <title>Mditoor &ndash; Free Markdown &amp; MDX Editor for Developer Blogs</title>
+  <meta name="description" content="Mditoor is a free, open-source desktop Markdown and MDX editor for developer blogs. Write .md/.mdx posts, edit frontmatter, compress images, publish with git." />
+  <meta name="keywords" content="markdown editor, mdx editor, md editor, blog markdown editor, markdown blog editor, desktop markdown editor, offline markdown editor, open source markdown editor, markdown editor for windows, frontmatter editor, git-based cms, static site cms, headless cms alternative, next.js blog editor, astro blog editor, hugo editor, jekyll editor, docusaurus blog, image compression for blogs, rtl markdown editor, arabic markdown editor" />
+  <meta name="author" content="Ezzdin Atef" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <link rel="canonical" href="https://mditoor.com/" />
   <meta name="color-scheme" content="light dark" />
   <meta name="theme-color" content="#f2f5f6" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#0b1115" media="(prefers-color-scheme: dark)" />
-  <meta property="og:title" content="Mditoor &mdash; The Markdown studio for developers who blog" />
-  <meta property="og:description" content="Posts, ideas, images, and git for every blog you run, in one desktop app. Plain .md and .mdx files in your repos." />
+
   <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Mditoor" />
+  <meta property="og:url" content="https://mditoor.com/" />
+  <meta property="og:title" content="Mditoor &ndash; Free Markdown &amp; MDX Editor for Developer Blogs" />
+  <meta property="og:description" content="Write Markdown and MDX blog posts, manage ideas, compress images and publish with git, across every site you run. Free, open source, local-first." />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:image" content="https://mditoor.com/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Mditoor: the Markdown and MDX editor for developers who blog, shown next to the app window" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://mditoor.com/og.png" />
+  <meta name="twitter:title" content="Mditoor &ndash; Free Markdown &amp; MDX Editor for Developer Blogs" />
+  <meta name="twitter:description" content="A desktop Markdown and MDX editor for developer blogs: posts, ideas, images and git in one app." />
+
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/assets/logo.svg" />
+  <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://mditoor.com/#app",
+        "name": "Mditoor",
+        "alternateName": "Mditoor Markdown & MDX Editor",
+        "description": "A free, open-source desktop Markdown and MDX editor for developer blogs. Manage posts, ideas, images, frontmatter and git across multiple static sites.",
+        "applicationCategory": "DeveloperApplication",
+        "applicationSubCategory": "Markdown editor",
+        "operatingSystem": "Windows 10, Windows 11, macOS, Linux",
+        "url": "https://mditoor.com/",
+        "downloadUrl": "https://mditoor.com/download",
+        "softwareVersion": "1.0.0",
+        "fileSize": "4MB",
+        "license": "https://opensource.org/licenses/MIT",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "author": { "@type": "Person", "name": "Ezzdin Atef", "url": "https://github.com/ezzdin-atef" },
+        "codeRepository": "https://github.com/ezzdin-atef/mditoor",
+        "inLanguage": ["en", "ar", "fr"],
+        "featureList": [
+          "Markdown and MDX editor with block and raw modes",
+          "Frontmatter editor with custom fields (YAML and TOML)",
+          "Blog post manager with drafts and gallery view",
+          "Ideas board for planning blog posts",
+          "Image compression and resizing on import",
+          "Multiple workspaces for multiple blogs and repos",
+          "Image storage next to posts, in public/, or on S3-compatible buckets",
+          "Built-in git: diff, commit, pull and push",
+          "Right-to-left (RTL) and left-to-right text per block",
+          "Presets for Next.js, Astro, Hugo, Jekyll, Docusaurus, Eleventy and Nuxt Content"
+        ]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://mditoor.com/#website",
+        "name": "Mditoor",
+        "url": "https://mditoor.com/"
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "Is Mditoor a free Markdown editor?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Mditoor is free and open source under the MIT license. There is no account, subscription or telemetry." } },
+          { "@type": "Question", "name": "Can I edit MDX files with Mditoor?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Mditoor is a Markdown and MDX editor. It opens .md and .mdx files in place, keeps imports and JSX components intact, and edits frontmatter as a form." } },
+          { "@type": "Question", "name": "Which blog frameworks does Mditoor support?", "acceptedAnswer": { "@type": "Answer", "text": "Mditoor has presets for Next.js, Astro, Hugo, Jekyll, Docusaurus, Eleventy and Nuxt Content, plus a generic preset for any static site that stores posts as Markdown or MDX files." } },
+          { "@type": "Question", "name": "Is Mditoor a CMS?", "acceptedAnswer": { "@type": "Answer", "text": "Mditoor works like a local, git-based CMS for static sites. Your posts stay as plain Markdown files in your repository and you publish by committing and pushing from the app." } },
+          { "@type": "Question", "name": "Does Mditoor compress images?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Images are resized, compressed and optionally sharpened when you add them, and the asset gallery shows unused images so you can clean them up." } },
+          { "@type": "Question", "name": "Does Mditoor work offline?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Mditoor is a local-first desktop app. It only uses the network for git operations and image uploads that you trigger." } },
+          { "@type": "Question", "name": "Is Mditoor available for Mac and Linux?", "acceptedAnswer": { "@type": "Answer", "text": "A Windows installer is available now. On macOS and Linux you can build Mditoor from source; packaged builds are planned." } }
+        ]
+      }
+    ]
+  }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Arabic:wght@400;600;700&display=swap" />
@@ -39,8 +117,8 @@
     <section class="hero">
       <div class="wrap">
         <a class="badge badge-accent" href="/download" data-release-badge>Free &amp; open source &middot; Windows installer available</a>
-        <h1>The Markdown studio for developers who <em>blog</em>.</h1>
-        <p class="lede">Write posts, capture ideas, compress images, and publish to every site you run &mdash; from one desktop app. Mditoor works on the plain <code>.md</code> and <code>.mdx</code> files in your repos, with git built in.</p>
+        <h1>The Markdown &amp; MDX editor for developers who <em>blog</em>.</h1>
+        <p class="lede">Write blog posts, capture ideas, compress images, and publish to every site you run &mdash; from one desktop app. Mditoor edits the plain <code>.md</code> and <code>.mdx</code> files in your repos, with a frontmatter editor and git built in.</p>
         <div class="cta-row">
           <a class="mac-btn mac-btn-primary mac-btn-lg" href="/download">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M3 13.5h10"/></svg>
@@ -100,7 +178,7 @@
                 <div class="page-head-row">
                   <span class="ws-icon ws-icon-lg" data-mock-icon aria-hidden="true">📝</span>
                   <div style="min-width:0">
-                    <h2 class="page-title" data-mock-name>Personal blog</h2>
+                    <div class="page-title" data-mock-name>Personal blog</div>
                     <p class="page-path" data-mock-path>~/code/my-site/content/posts</p>
                   </div>
                   <span class="mac-btn mac-btn-primary" aria-hidden="true">
@@ -134,12 +212,12 @@
                     <div class="mac-segmented"><span class="mac-segment active">Gallery</span><span class="mac-segment">List</span></div>
                   </div>
                   <div class="post-grid">
-                    <article class="post-card"><div class="post-cover" style="background:#0d8f86">SR<span class="glass-badge">Published</span></div><div class="post-card-body"><h3 class="post-card-title">Shipping React Server Components to prod</h3><p class="post-card-excerpt">What broke, what got faster, and the caching bug that cost us a weekend.</p><div class="post-card-meta"><span>Sep 24</span><span>8 min read</span></div></div></article>
-                    <article class="post-card"><div class="post-cover" style="background:#d9663f">RT<span class="glass-badge draft">Draft</span></div><div class="post-card-body"><h3 class="post-card-title">Rust traits for TypeScript developers</h3><p class="post-card-excerpt">Interfaces, generics and the borrow checker, mapped to things you already know.</p><div class="post-card-meta"><span>Edited 2h ago</span><span>5 min read</span></div></div></article>
-                    <article class="post-card"><div class="post-cover" style="background:#2f78c4">PG<span class="glass-badge">Published</span></div><div class="post-card-body"><h3 class="post-card-title">Postgres indexes I actually use</h3><p class="post-card-excerpt">Partial, covering and BRIN indexes with real query plans from a side project.</p><div class="post-card-meta"><span>Sep 12</span><span>11 min read</span></div></div></article>
-                    <article class="post-card"><div class="post-cover" style="background:#5b6fb8">FO<span class="glass-badge">Published</span></div><div class="post-card-body"><h3 class="post-card-title">Self-hosting web fonts the right way</h3><p class="post-card-excerpt">Subsetting, preload, and font-display without the layout shift.</p><div class="post-card-meta"><span>Aug 30</span><span>4 min read</span></div></div></article>
-                    <article class="post-card"><div class="post-cover" style="background:#c28a12">نص<span class="glass-badge draft">Draft</span></div><div class="post-card-body"><h3 class="post-card-title" dir="rtl">مقدمة إلى Docker للمطورين</h3><p class="post-card-excerpt" dir="rtl">شرح عملي للحاويات من الصفر.</p><div class="post-card-meta"><span>Edited yesterday</span><span>6 min read</span></div></div></article>
-                    <article class="post-card"><div class="post-cover" style="background:#3f9a5c">CI<span class="glass-badge">Published</span></div><div class="post-card-body"><h3 class="post-card-title">A 40-line GitHub Actions cache that works</h3><p class="post-card-excerpt">Stop reinstalling node_modules on every push.</p><div class="post-card-meta"><span>Aug 18</span><span>3 min read</span></div></div></article>
+                    <article class="post-card"><div class="post-cover" style="background:#0d8f86">SR<span class="glass-badge">Published</span></div><div class="post-card-body"><p class="post-card-title">Shipping React Server Components to prod</p><p class="post-card-excerpt">What broke, what got faster, and the caching bug that cost us a weekend.</p><div class="post-card-meta"><span>Sep 24</span><span>8 min read</span></div></div></article>
+                    <article class="post-card"><div class="post-cover" style="background:#d9663f">RT<span class="glass-badge draft">Draft</span></div><div class="post-card-body"><p class="post-card-title">Rust traits for TypeScript developers</p><p class="post-card-excerpt">Interfaces, generics and the borrow checker, mapped to things you already know.</p><div class="post-card-meta"><span>Edited 2h ago</span><span>5 min read</span></div></div></article>
+                    <article class="post-card"><div class="post-cover" style="background:#2f78c4">PG<span class="glass-badge">Published</span></div><div class="post-card-body"><p class="post-card-title">Postgres indexes I actually use</p><p class="post-card-excerpt">Partial, covering and BRIN indexes with real query plans from a side project.</p><div class="post-card-meta"><span>Sep 12</span><span>11 min read</span></div></div></article>
+                    <article class="post-card"><div class="post-cover" style="background:#5b6fb8">FO<span class="glass-badge">Published</span></div><div class="post-card-body"><p class="post-card-title">Self-hosting web fonts the right way</p><p class="post-card-excerpt">Subsetting, preload, and font-display without the layout shift.</p><div class="post-card-meta"><span>Aug 30</span><span>4 min read</span></div></div></article>
+                    <article class="post-card"><div class="post-cover" style="background:#c28a12">نص<span class="glass-badge draft">Draft</span></div><div class="post-card-body"><p class="post-card-title" dir="rtl">مقدمة إلى Docker للمطورين</p><p class="post-card-excerpt" dir="rtl">شرح عملي للحاويات من الصفر.</p><div class="post-card-meta"><span>Edited yesterday</span><span>6 min read</span></div></div></article>
+                    <article class="post-card"><div class="post-cover" style="background:#3f9a5c">CI<span class="glass-badge">Published</span></div><div class="post-card-body"><p class="post-card-title">A 40-line GitHub Actions cache that works</p><p class="post-card-excerpt">Stop reinstalling node_modules on every push.</p><div class="post-card-meta"><span>Aug 18</span><span>3 min read</span></div></div></article>
                   </div>
                 </div>
 
@@ -240,16 +318,16 @@
       <div class="wrap">
         <div class="section-head">
           <span class="label-caps">One app, the whole workflow</span>
-          <h2>From idea to published post, without the tab juggling.</h2>
-          <p>Mditoor sits on top of the repos you already have. No CMS, no database, no lock-in &mdash; just a better way to work with your content.</p>
+          <h2>A blog Markdown editor that covers the whole workflow.</h2>
+          <p>Mditoor sits on top of the repos you already have. Think of it as a local, git-based CMS for your static site &mdash; no hosted backend, no database, no lock-in.</p>
         </div>
 
         <div class="pillars">
           <article class="pillar">
             <div class="pillar-copy">
               <div class="pillar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6zM9 12h6M9 16h6"/></svg></div>
-              <h3>Blog posts, managed like a CMS</h3>
-              <p>Browse every post as a gallery or list, see drafts at a glance, and write in a block editor or raw Markdown. Frontmatter becomes a real form with dates, selects, tags and image pickers.</p>
+              <h3>MDX and Markdown editor with a frontmatter form</h3>
+              <p>Browse every blog post as a gallery or list, see drafts at a glance, and write in a block editor or raw Markdown. Frontmatter becomes a real form with dates, selects, tags and image pickers &mdash; no hand-editing YAML.</p>
               <ul class="checks">
                 <li>Block editor with slash menu, code blocks, tables and callouts</li>
                 <li>Custom frontmatter fields per workspace, YAML or TOML</li>
@@ -277,8 +355,8 @@
           <article class="pillar flip">
             <div class="pillar-copy">
               <div class="pillar-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3zM9.5 20h5"/></svg></div>
-              <h3>An ideas board that feeds your drafts</h3>
-              <p>Capture post ideas the moment they show up, move them from Inbox to Up next, and turn any idea into a draft post with one click. Ideas live in your repo next to the posts.</p>
+              <h3>A blog ideas board that feeds your drafts</h3>
+              <p>Capture blog post ideas the moment they show up, move them from Inbox to Up next, and turn any idea into a draft post with one click. Ideas live in your repo next to the posts.</p>
               <ul class="checks">
                 <li>Quick capture from anywhere with the command palette</li>
                 <li>Star, search and reorder by stage</li>
@@ -304,8 +382,8 @@
           <article class="pillar">
             <div class="pillar-copy">
               <div class="pillar-icon coral"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="8.5" cy="10" r="1.6"/><path d="m3 17 5-4.5 4 3.5 3-2.5 6 5"/></svg></div>
-              <h3>Images compressed before they hit your repo</h3>
-              <p>Drag a screenshot in and Mditoor resizes, compresses and sharpens it on import. The asset gallery shows every image in the workspace and flags the ones no post uses anymore.</p>
+              <h3>Image compression before images hit your repo</h3>
+              <p>Drag a screenshot in and Mditoor resizes, compresses and sharpens it on import, so your blog stays fast. The asset gallery shows every image in the workspace and flags the ones no post uses anymore.</p>
               <ul class="checks">
                 <li>Max width, quality and sharpening per workspace</li>
                 <li>Re-optimize any existing image from the gallery</li>
@@ -328,7 +406,7 @@
           <article class="pillar flip">
             <div class="pillar-copy">
               <div class="pillar-icon indigo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01"/></svg></div>
-              <h3>Every blog you run, every place images live</h3>
+              <h3>Multiple blogs, repos and image sources</h3>
               <p>Add a workspace per repo &mdash; your personal blog, the docs site, the company blog &mdash; and switch between them instantly. Each one picks where its images go: next to the post, a <code>public/</code> folder, or any S3-compatible bucket.</p>
               <ul class="checks">
                 <li>Unlimited workspaces, each with its own fields and framework preset</li>
@@ -357,7 +435,7 @@
       <div class="wrap">
         <div class="section-head">
           <span class="label-caps">And the rest</span>
-          <h2>Built for how developers actually write.</h2>
+          <h2>A desktop Markdown editor built for how developers write.</h2>
         </div>
         <div class="feature-grid">
           <div class="feature-card"><span class="ws-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="15" r="2"/><circle cx="14" cy="8" r="2"/><path d="M6 7v6M14 10c0 2.5-3 3-8 3"/></svg></span><h3>Git built in</h3><p>Status, diffs, stage, commit, pull and push without leaving the post.</p></div>
@@ -376,8 +454,8 @@
       <div class="wrap">
         <div class="section-head">
           <span class="label-caps">Framework presets</span>
-          <h2>Works with the site you already have.</h2>
-          <p>Point Mditoor at a repo and it detects the framework, finds the posts folder, and picks sensible defaults. Everything can be changed later.</p>
+          <h2>A Markdown blog editor for Next.js, Astro, Hugo and more.</h2>
+          <p>Point Mditoor at your static site's repo and it detects the framework, finds the posts folder, and picks sensible defaults. Everything can be changed later.</p>
         </div>
         <div class="panel table-panel">
           <table>
@@ -394,7 +472,46 @@
             </tbody>
           </table>
         </div>
-        <p class="note">Layout not listed? <a href="https://github.com/ezzdin-atef/mditoor/issues">Open an issue</a> with an example repo.</p>
+        <p class="note">Using another framework, or storing posts in a different folder structure? The Generic preset lets you set the folder, file name and frontmatter format yourself &mdash; or <a href="https://github.com/ezzdin-atef/mditoor/issues">request a preset</a>.</p>
+      </div>
+    </section>
+
+    <section class="section" id="faq">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="label-caps">FAQ</span>
+          <h2>Questions about the Markdown &amp; MDX editor</h2>
+        </div>
+        <div class="faq">
+          <details open>
+            <summary>Is Mditoor a free Markdown editor?</summary>
+            <p>Yes. Mditoor is free and open source under the MIT license. There is no account, subscription or telemetry.</p>
+          </details>
+          <details>
+            <summary>Can I edit MDX files with Mditoor?</summary>
+            <p>Yes. Mditoor is a Markdown and MDX editor. It opens <code>.md</code> and <code>.mdx</code> files in place, keeps imports and JSX components intact, and edits frontmatter as a form.</p>
+          </details>
+          <details>
+            <summary>Which blog frameworks does Mditoor support?</summary>
+            <p>Mditoor has presets for Next.js, Astro, Hugo, Jekyll, Docusaurus, Eleventy and Nuxt Content, plus a generic preset for any static site that stores posts as Markdown or MDX files.</p>
+          </details>
+          <details>
+            <summary>Is Mditoor a CMS?</summary>
+            <p>Mditoor works like a local, git-based CMS for static sites. Your posts stay as plain Markdown files in your repository and you publish by committing and pushing from the app.</p>
+          </details>
+          <details>
+            <summary>Does Mditoor compress images?</summary>
+            <p>Yes. Images are resized, compressed and optionally sharpened when you add them, and the asset gallery shows unused images so you can clean them up.</p>
+          </details>
+          <details>
+            <summary>Does Mditoor work offline?</summary>
+            <p>Yes. Mditoor is a local-first desktop app. It only uses the network for git operations and image uploads that you trigger.</p>
+          </details>
+          <details>
+            <summary>Is Mditoor available for Mac and Linux?</summary>
+            <p>A Windows installer is available now. On macOS and Linux you can <a class="link" href="/download#build">build Mditoor from source</a>; packaged builds are planned.</p>
+          </details>
+        </div>
       </div>
     </section>
 
