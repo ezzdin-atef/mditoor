@@ -79,8 +79,8 @@
     try { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
     catch (e) { return iso.slice(0, 10); }
   }
-  function setField(name, value) {
-    document.querySelectorAll('[data-field="' + name + '"]').forEach(function (el) { el.textContent = value; });
+  function setField(name, value, scope) {
+    (scope || document).querySelectorAll('[data-field="' + name + '"]').forEach(function (el) { el.textContent = value; });
   }
   function el(tag, cls, text) {
     var node = document.createElement(tag);
@@ -109,7 +109,7 @@
     if (!platforms) return;
     setField('version', 'Latest');
     setField('file', 'See GitHub Releases');
-    setField('size', '~4 MB');
+    setField('size', '-');
     setField('date', '-');
     var list = document.querySelector('[data-releases]');
     if (list) {
@@ -137,22 +137,39 @@
       if (!platforms) return;
 
       var assets = latest.assets || [];
-      var exe = assets.find(function (a) { return /windows.*\.exe$/i.test(a.name); }) ||
-        assets.find(function (a) { return /\.exe$/i.test(a.name); });
+      // Each download button names the file type it wants; the first matching
+      // asset in the latest stable release fills its card.
+      var PATTERNS = { exe: /\.exe$/i, dmg: /\.dmg$/i, appimage: /\.AppImage$/i, deb: /\.deb$/i };
+      var LABELS = { exe: 'for Windows', dmg: 'for macOS', appimage: 'AppImage', deb: '.deb' };
 
       setField('version', latest.tag_name);
       setField('date', formatDate(latest.published_at));
-      if (exe) {
-        setField('file', exe.name);
-        setField('file-inline', exe.name);
-        setField('size', formatSize(exe.size));
-        var btn = document.querySelector('[data-download]');
-        btn.href = exe.browser_download_url;
-        btn.querySelector('[data-download-label]').textContent = 'Download ' + latest.tag_name + ' for Windows';
-      } else {
-        setField('file', 'See release page');
-        setField('size', '-');
-      }
+      document.querySelectorAll('[data-download]').forEach(function (btn) {
+        var kind = btn.getAttribute('data-download');
+        var asset = assets.find(function (a) { return PATTERNS[kind].test(a.name); });
+        var card = btn.closest('.platform');
+        var primary = card.querySelector('[data-download]') === btn;
+        var label = btn.querySelector('[data-download-label]');
+        if (asset) {
+          btn.href = asset.browser_download_url;
+          label.textContent = 'Download ' + latest.tag_name + ' ' + LABELS[kind];
+          if (primary) {
+            setField('file', asset.name, card);
+            setField('size', formatSize(asset.size), card);
+            if (kind === 'exe') setField('file-inline', asset.name);
+          }
+        } else {
+          // Older releases predate this platform's builds.
+          btn.href = RELEASES_URL;
+          if (primary) {
+            label.textContent = 'Coming in the next release';
+            setField('file', 'Not in ' + latest.tag_name, card);
+            setField('size', '-', card);
+          } else {
+            btn.hidden = true;
+          }
+        }
+      });
 
       var summary = document.querySelector('[data-release-summary]');
       if (summary) summary.textContent = 'Latest version: ' + latest.tag_name + ', released ' + formatDate(latest.published_at) + '.';
