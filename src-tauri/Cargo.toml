@@ -1,6 +1,6 @@
 [package]
 name = "mditoor"
-version = "2.1.0"
+version = "2.1.1"
 description = "Mditoor — MDX post editor"
 authors = ["Ezzdin Atef"]
 edition = "2021"
