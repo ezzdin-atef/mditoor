@@ -67,11 +67,23 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          flags=(--draft --verify-tag --title "Mditoor $GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md)
-          [ "${{ steps.version.outputs.prerelease }}" = "true" ] && flags+=(--prerelease)
           # Re-running the workflow reuses the existing draft instead of failing.
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" "${flags[@]}"
-          id=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --jq ".[] | select(.tag_name==\"${GITHUB_REF_NAME}\") | .id" | head -n1)
+          id=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate --jq ".[] | select(.tag_name==\"${GITHUB_REF_NAME}\") | .id" | head -n1)
+          if [ -z "$id" ]; then
+            # Take the id from the create response: the releases list is eventually
+            # consistent and may not include a just-created draft yet.
+            id=$(gh api -X POST "repos/${GITHUB_REPOSITORY}/releases" \
+              -f tag_name="$GITHUB_REF_NAME" \
+              -f name="Mditoor $GITHUB_REF_NAME" \
+              -F body=@RELEASE_NOTES.md \
+              -F draft=true \
+              -F prerelease=${{ steps.version.outputs.prerelease }} \
+              --jq .id)
+          fi
+          if [ -z "$id" ]; then
+            echo "::error::Could not create or find a release for $GITHUB_REF_NAME"
+            exit 1
+          fi
           echo "id=$id" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node
