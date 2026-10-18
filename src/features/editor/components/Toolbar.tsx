@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { RefObject } from 'react';
+import { MOD } from '../../../lib/ui';
 
 interface Props {
   textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -97,8 +98,8 @@ const GROUPS: { label: string; buttons: ToolbarBtn[] }[] = [
   {
     label: 'Inline',
     buttons: [
-      { label: 'B',  title: 'Bold · Ctrl+B',   action: inline('**') },
-      { label: 'I',  title: 'Italic · Ctrl+I', action: inline('*') },
+      { label: 'B',  title: `Bold · ${MOD}B`,   action: inline('**') },
+      { label: 'I',  title: `Italic · ${MOD}I`, action: inline('*') },
       { label: 'S',  title: 'Strikethrough',   action: inline('~~') },
       { label: '`',  title: 'Inline code',      action: inline('`') },
     ],

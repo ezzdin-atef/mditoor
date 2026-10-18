@@ -1,7 +1,9 @@
-name: Release Windows app
+name: Release app
 
 # Cut a release locally with `pnpm release patch|minor|major` (see scripts/release.mjs).
-# That pushes a vX.Y.Z tag, which runs this workflow.
+# That pushes a vX.Y.Z tag, which runs this workflow:
+#   prepare -> build (Windows, macOS, Linux in parallel) -> publish
+# Windows is the stable platform; macOS and Linux assets carry "alpha" in their names.
 on:
   push:
     tags:
@@ -12,11 +14,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  prepare:
+    runs-on: ubuntu-latest
     permissions:
       contents: write
-
-    runs-on: windows-latest
+    outputs:
+      release-id: ${{ steps.draft.outputs.id }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
 
     steps:
       - name: Check out the tagged revision
@@ -64,6 +68,9 @@ jobs:
           range=${prev:+$prev..}$GITHUB_REF_NAME
           log() { git log "$range" --no-merges --pretty='- %s (%h)' | grep -E "$1" | grep -v 'chore(release)' || true; }
           {
+            printf '> **macOS and Linux builds are alpha.** They are built automatically but not regularly tested. '
+            printf 'The macOS app is not notarized: if macOS says it is damaged, run `xattr -cr /Applications/Mditoor.app`. '
+            printf 'Please [report issues](https://github.com/%s/issues).\n\n' "$GITHUB_REPOSITORY"
             features=$(log '^- feat')
             fixes=$(log '^- fix')
             other=$(git log "$range" --no-merges --pretty='- %s (%h)' | grep -vE '^- (feat|fix)' | grep -v 'chore(release)' || true)
@@ -75,7 +82,7 @@ jobs:
           cat RELEASE_NOTES.md
 
       # Created as a draft so users (and the in-app updater, which reads
-      # releases/latest) never see a release whose installer isn't uploaded yet.
+      # releases/latest) never see a release whose installers aren't uploaded yet.
       - name: Create draft release
         id: draft
         shell: bash
@@ -101,6 +108,45 @@ jobs:
           fi
           echo "id=$id" >> "$GITHUB_OUTPUT"
 
+  build:
+    needs: prepare
+    permissions:
+      contents: write
+    strategy:
+      # Let the other platforms finish so a re-run only has to redo the failed one.
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            args: --bundles nsis
+            assets: Mditoor-Setup-[version]-Windows-[arch][ext]
+          # One universal binary covers both Intel and Apple Silicon Macs.
+          - name: macOS
+            os: macos-latest
+            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
+            args: --target universal-apple-darwin --bundles app,dmg
+            assets: Mditoor-[version]-macOS-alpha-[arch][ext]
+          # The oldest supported Ubuntu, so the binary links against an older glibc
+          # and runs on more distros.
+          - name: Linux
+            os: ubuntu-22.04
+            args: --bundles appimage,deb
+            assets: Mditoor-[version]-Linux-alpha-[arch][ext]
+
+    name: build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Check out the tagged revision
+        uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -113,6 +159,8 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -125,7 +173,7 @@ jobs:
       - name: Check Tauri npm/Rust versions match
         run: node scripts/check-tauri-versions.mjs
 
-      - name: Build and upload installer
+      - name: Build and upload installers
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -133,21 +181,79 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          releaseId: ${{ steps.draft.outputs.id }}
+          releaseId: ${{ needs.prepare.outputs.release-id }}
           tagName: ${{ github.ref_name }}
           # --locked fails if Cargo.lock is out of date with Cargo.toml.
-          args: --bundles nsis -- --locked
-          releaseAssetNamePattern: Mditoor-Setup-[version]-Windows-[arch][ext]
-          # Publishes latest.json, which the in-app updater polls.
-          uploadUpdaterJson: true
+          args: ${{ matrix.args }} -- --locked
+          releaseAssetNamePattern: ${{ matrix.assets }}
+          # The publish job writes latest.json once every platform has uploaded;
+          # parallel jobs each merging into it could overwrite one another.
+          uploadUpdaterJson: false
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      # The in-app updater polls releases/latest/download/latest.json. Each updater
+      # bundle has a .sig next to it; map them to the updater's platform keys.
+      - name: Write latest.json
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release-id }}
+        run: |
+          release=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}")
+          platforms='{}'
+          while IFS=$'\t' read -r asset_id name; do
+            bundle=${name%.sig}
+            case "$bundle" in
+              *.exe)        keys='windows-x86_64 windows-x86_64-nsis' ;;
+              *.app.tar.gz) keys='darwin-x86_64 darwin-aarch64 darwin-x86_64-app darwin-aarch64-app' ;;
+              *.AppImage)   keys='linux-x86_64 linux-x86_64-appimage' ;;
+              *.deb)        keys='linux-x86_64-deb' ;;
+              *) continue ;;
+            esac
+            sig=$(gh api -H 'Accept: application/octet-stream' "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}")
+            # Draft assets have "untagged-..." download URLs; this is the URL once published.
+            url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${bundle}"
+            for key in $keys; do
+              platforms=$(jq --arg k "$key" --arg s "$sig" --arg u "$url" '. + {($k): {signature: $s, url: $u}}' <<< "$platforms")
+            done
+          done < <(jq -r '.assets[] | select(.name | endswith(".sig")) | "\(.id)\t\(.name)"' <<< "$release")
+
+          for key in windows-x86_64 darwin-aarch64 linux-x86_64; do
+            if ! jq -e --arg k "$key" 'has($k)' <<< "$platforms" > /dev/null; then
+              echo "::error::No signed updater bundle found for $key"
+              exit 1
+            fi
+          done
+
+          jq -n \
+            --arg version "${GITHUB_REF_NAME#v}" \
+            --arg notes "$(jq -r '.body // ""' <<< "$release")" \
+            --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --argjson platforms "$platforms" \
+            '{version: $version, notes: $notes, pub_date: $date, platforms: $platforms}' > latest.json
+          cat latest.json
+
+          # Re-runs replace the previous latest.json.
+          old=$(jq -r '.assets[] | select(.name == "latest.json") | .id' <<< "$release")
+          [ -n "$old" ] && gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${old}"
+          upload_url=$(jq -r '.upload_url' <<< "$release" | sed 's/{.*}//')
+          gh api -X POST "${upload_url}?name=latest.json" \
+            -H 'Content-Type: application/json' --input latest.json > /dev/null
 
       - name: Publish release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release-id }}
         run: |
-          if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then
-            gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease
+          if [ "${{ needs.prepare.outputs.prerelease }}" = "true" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" -F draft=false -F prerelease=true > /dev/null
           else
-            gh release edit "$GITHUB_REF_NAME" --draft=false --latest
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" -F draft=false -f make_latest=true > /dev/null
           fi

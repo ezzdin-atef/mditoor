@@ -69,8 +69,8 @@ Next.js is the most tested. If your setup does not fit a preset, please [open an
 | Platform | Status                                                  |
 | -------- | ------------------------------------------------------- |
 | Windows  | Prebuilt installer on the Releases page                 |
-| macOS    | Builds from source; not yet packaged or regularly tested |
-| Linux    | Builds from source; not yet packaged or regularly tested |
+| macOS    | Alpha: prebuilt universal `.dmg`, not regularly tested   |
+| Linux    | Alpha: prebuilt `.AppImage` and `.deb`, not regularly tested |
 
 Help testing and packaging macOS and Linux builds is one of the most useful contributions right now.
 
@@ -82,9 +82,15 @@ Download the latest `Mditoor-Setup-<version>-Windows-x64.exe` from the [Releases
 
 The installer is not code-signed yet, so Windows SmartScreen may warn you. Choose **More info → Run anyway** if you trust the source, or [build it yourself](#building-from-source).
 
-### macOS / Linux
+### macOS (alpha)
 
-Build from source for now — see below.
+Download `Mditoor-<version>-macOS-alpha-universal.dmg` from the [Releases page](https://github.com/ezzdin-atef/mditoor/releases) and drag Mditoor into Applications. It runs on both Intel and Apple Silicon Macs.
+
+The app is not notarized yet. If macOS refuses to open it, open **System Settings → Privacy & Security** and choose **Open Anyway**, or run `xattr -cr /Applications/Mditoor.app`. The Git panel needs git, which macOS offers to install (Xcode Command Line Tools) the first time it is used.
+
+### Linux (alpha)
+
+Download from the [Releases page](https://github.com/ezzdin-atef/mditoor/releases) either the `.AppImage` (make it executable and run it; it updates itself) or the `.deb` (`sudo apt install ./Mditoor-*-Linux-alpha-*.deb`). Requires WebKitGTK 4.1, which current Ubuntu, Debian and Fedora releases ship.
 
 ## Getting started
 
@@ -230,12 +236,13 @@ From a clean `main`:
 pnpm release patch        # or minor / major / an explicit version like 2.1.0-beta.1
 ```
 
-This bumps the version in `package.json`, `Cargo.toml` and `Cargo.lock`, commits `chore(release): vX.Y.Z`, tags it and pushes. The tag starts the **Release Windows app** workflow, which:
+This bumps the version in `package.json`, `Cargo.toml` and `Cargo.lock`, commits `chore(release): vX.Y.Z`, tags it and pushes. The tag starts the **Release app** workflow, which:
 
 1. Checks the tag matches `package.json` (fails otherwise).
 2. Creates a draft release with a changelog grouped from `feat:` / `fix:` commits since the previous tag.
-3. Builds and uploads `Mditoor-Setup-X.Y.Z-Windows-x64.exe` plus the signed `latest.json` for the in-app updater.
-4. Publishes the release. Versions with a `-suffix` are marked pre-release, so the updater does not offer them to stable users.
+3. Builds Windows, macOS and Linux in parallel and uploads `Mditoor-Setup-X.Y.Z-Windows-x64.exe` plus the alpha macOS (`.dmg`) and Linux (`.AppImage`, `.deb`) builds.
+4. Writes the signed `latest.json` for the in-app updater once every platform has uploaded.
+5. Publishes the release. Versions with a `-suffix` are marked pre-release, so the updater does not offer them to stable users.
 
 Use `--dry-run` to preview the next version, or `--no-push` to commit and tag without pushing.
 
