@@ -1,0 +1,53 @@
+name: CI
+
+# Runs the same build as the release workflow (minus installer bundling and signing)
+# on every push to main and every PR, so a broken build is caught before a release
+# tag is ever pushed. Its Rust cache is also reused by release runs.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install frontend deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Check Tauri npm/Rust versions match
+        run: node scripts/check-tauri-versions.mjs
+
+      - name: Typecheck and build frontend
+        run: pnpm build
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      # --locked fails if Cargo.lock is out of date with Cargo.toml.
+      - name: Build app (no installer)
+        run: pnpm tauri build --no-bundle -- --locked

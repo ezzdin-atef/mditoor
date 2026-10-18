@@ -7,6 +7,10 @@
 //   pnpm release 2.1.0-beta.1             explicit version (pre-releases allowed)
 //   pnpm release minor --dry-run          show what would change, touch nothing
 //   pnpm release minor --no-push          commit and tag locally only
+//   pnpm release minor --skip-checks      skip the preflight build checks (not recommended)
+//
+// Before changing anything it runs a preflight: lockfiles in sync, Tauri npm/Rust
+// versions matching, frontend build, cargo check, CI green and signing secret present.
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +20,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
 const push = !args.includes('--no-push');
+const skipChecks = args.includes('--skip-checks');
 const bump = args.find((a) => !a.startsWith('--'));
 
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?$/;
@@ -51,6 +56,60 @@ if (git('status --porcelain')) fail('working tree is not clean; commit or stash 
 if (git(`tag --list ${tag}`)) fail(`tag ${tag} already exists`);
 
 console.log(`${current} -> ${next} (${tag})`);
+
+// Preflight: run what the release workflow would run, so a broken build fails here
+// in seconds instead of on GitHub after the tag is already pushed.
+if (!skipChecks) {
+  const run = (cmd, cwd = root) => {
+    console.log(`\n> ${cmd}`);
+    try {
+      execSync(cmd, { cwd, stdio: 'inherit' });
+    } catch {
+      fail(`preflight failed: ${cmd} (fix it, or pass --skip-checks to bypass)`);
+    }
+  };
+  const has = (cmd) => {
+    try {
+      execSync(cmd, { stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  if (push) {
+    git('fetch origin main --tags');
+    if (git('rev-list --count HEAD..origin/main') !== '0') fail('main is behind origin/main; pull first');
+    if (git(`ls-remote --tags origin refs/tags/${tag}`)) fail(`tag ${tag} already exists on origin`);
+  }
+
+  if (has('gh auth status')) {
+    const sha = git('rev-parse HEAD');
+    let ci = [];
+    try {
+      ci = JSON.parse(
+        execSync(`gh run list --workflow ci.yml --commit ${sha} --json conclusion --limit 1`, {
+          cwd: root,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+        }) || '[]',
+      );
+    } catch {
+      // ci.yml not on GitHub yet, or no run for this commit: the local build below still runs.
+    }
+    if (ci[0]?.conclusion === 'failure') fail(`CI failed on ${sha.slice(0, 7)}; fix it before releasing`);
+    const secrets = execSync('gh secret list', { cwd: root, encoding: 'utf8' });
+    if (!/^TAURI_SIGNING_PRIVATE_KEY\s/m.test(secrets)) fail('repo secret TAURI_SIGNING_PRIVATE_KEY is missing');
+  } else {
+    console.log('gh CLI not signed in; skipping CI status and secret checks');
+  }
+
+  run('pnpm install --frozen-lockfile');
+  run('node scripts/check-tauri-versions.mjs');
+  run('pnpm build');
+  run('cargo check --locked', join(root, 'src-tauri'));
+  console.log('\npreflight passed');
+}
 if (dryRun) {
   console.log('dry run: no files changed');
   process.exit(0);

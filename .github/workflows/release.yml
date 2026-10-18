@@ -39,8 +39,23 @@ jobs:
           if ($pkgVersion -ne $version) {
             throw "Tag $env:TAG does not match package.json version $pkgVersion. Use 'pnpm release' to bump both together."
           }
+          $cargoVersion = [regex]::Match((Get-Content src-tauri/Cargo.toml -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value
+          if ($cargoVersion -ne $version) {
+            throw "Tag $env:TAG does not match src-tauri/Cargo.toml version $cargoVersion. Use 'pnpm release' to bump both together."
+          }
           "version=$version" >> $env:GITHUB_OUTPUT
           "prerelease=$($version.Contains('-').ToString().ToLower())" >> $env:GITHUB_OUTPUT
+
+      # Fail in seconds rather than after a full build that can't be signed.
+      - name: Check signing secret is set
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::Repository secret TAURI_SIGNING_PRIVATE_KEY is not set"
+            exit 1
+          fi
 
       - name: Build changelog
         shell: bash
@@ -107,6 +122,9 @@ jobs:
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
 
+      - name: Check Tauri npm/Rust versions match
+        run: node scripts/check-tauri-versions.mjs
+
       - name: Build and upload installer
         uses: tauri-apps/tauri-action@v1
         env:
@@ -117,7 +135,8 @@ jobs:
         with:
           releaseId: ${{ steps.draft.outputs.id }}
           tagName: ${{ github.ref_name }}
-          args: --bundles nsis
+          # --locked fails if Cargo.lock is out of date with Cargo.toml.
+          args: --bundles nsis -- --locked
           releaseAssetNamePattern: Mditoor-Setup-[version]-Windows-[arch][ext]
           # Publishes latest.json, which the in-app updater polls.
           uploadUpdaterJson: true
