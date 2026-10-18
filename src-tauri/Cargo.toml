@@ -1,6 +1,6 @@
 [package]
 name = "mditoor"
-version = "0.1.0"
+version = "2.0.0"
 description = "Mditoor — MDX post editor"
 authors = ["Ezzdin Atef"]
 edition = "2021"
@@ -30,3 +30,7 @@ hex = "0.4"
 getrandom = "0.2"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-process = "2"
+tauri-plugin-updater = "2"

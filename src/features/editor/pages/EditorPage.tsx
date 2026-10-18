@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { marked } from 'marked';
 import { useTranslation } from 'react-i18next';
-import { pickImageFile, uploadImage } from '../../assets/imageUpload';
+import { pickImageFile, s3Ready, uploadImage } from '../../assets/imageUpload';
 import { useRouter, type Route } from '../../../router';
 import { useStore } from '../../workspace/store';
 import {
@@ -21,7 +21,10 @@ import { usePostDelete } from '../../posts/usePostDelete';
 import { postFileName } from '../../posts/postMeta';
 import type { FrontmatterFormat } from '../../workspace/types';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { toast } from '../../../components/Toast';
+import { crosspostDevArticle, readCrosspostLink, readDevManifest, resolveDevConflict, syncDevArticle, type DevEntry } from '../../dev/devSync';
+import { CrosspostDialog } from '../../dev/CrosspostDialog';
 import {
   buildContent,
   defaultMeta,
@@ -47,6 +50,7 @@ function EditorScreen({ route }: { route: EditorRoute }) {
   const { t } = useTranslation();
 
   const workspace = workspaces.find(w => w.id === route.workspaceId) ?? null;
+  const devTargets = workspaces.filter(w => w.kind === 'dev');
 
   const [body,       setBodyRaw]    = useState('');
   const [meta,       setMeta]       = useState<MetaValues>({});
@@ -61,6 +65,15 @@ function EditorScreen({ route }: { route: EditorRoute }) {
   const [dirty,      setDirty]      = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const [devEntry, setDevEntry] = useState<DevEntry | null>(null);
+  const [devEntryReady, setDevEntryReady] = useState(false);
+  const [devSyncing, setDevSyncing] = useState(false);
+  const [showCrosspost, setShowCrosspost] = useState(false);
+  const [crossTargetId, setCrossTargetId] = useState('');
+  const [crossCanonical, setCrossCanonical] = useState('');
+  const [crossSyncing, setCrossSyncing] = useState(false);
+  const [crossPublished, setCrossPublished] = useState(false);
+  const [crossLinkLoading, setCrossLinkLoading] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -79,6 +92,7 @@ function EditorScreen({ route }: { route: EditorRoute }) {
     setFmRaw('');
     if (route.isNew) {
       const meta = defaultMeta(workspace.metadataFields);
+      if (workspace.kind === 'dev') meta.draft = true;
       let body = route.seed?.body?.trim() ? `${route.seed.body.trim()}\n` : '';
       const seedTitle = route.seed?.title?.trim();
       if (seedTitle) {
@@ -121,6 +135,27 @@ function EditorScreen({ route }: { route: EditorRoute }) {
   const [onDisk, setOnDisk] = useState(!route.isNew);
   const { deletePost, confirmationDialog } = usePostDelete();
 
+  useEffect(() => {
+    if (workspace?.kind !== 'dev') { setDevEntry(null); setDevEntryReady(false); return; }
+    let alive = true;
+    setDevEntryReady(false);
+    readDevManifest(workspace.id)
+      .then(manifest => { if (alive) { setDevEntry(manifest[route.slug] ?? null); setDevEntryReady(true); } })
+      .catch(error => { if (alive) toast.error(t('dev.syncFailed'), String(error)); });
+    return () => { alive = false; };
+  }, [workspace?.id, workspace?.kind, route.slug, t]);
+
+  useEffect(() => {
+    if (!showCrosspost || !workspace || !crossTargetId) return;
+    let alive = true;
+    setCrossLinkLoading(true);
+    readCrosspostLink(workspace.id, crossTargetId, route.slug)
+      .then(entry => { if (alive) { setCrossPublished(Boolean(entry?.published)); setCrossCanonical(entry?.canonicalUrl ?? ''); } })
+      .catch(() => { if (alive) setCrossPublished(false); })
+      .finally(() => { if (alive) setCrossLinkLoading(false); });
+    return () => { alive = false; };
+  }, [showCrosspost, workspace?.id, crossTargetId, route.slug]);
+
   const save = useCallback(async (): Promise<boolean> => {
     if (!workspace || saving || !dirty || deletedRef.current) return true;
     setSaving(true);
@@ -142,6 +177,66 @@ function EditorScreen({ route }: { route: EditorRoute }) {
       setSaving(false);
     }
   }, [body, dirty, fmFormat, fmRaw, meta, route.slug, saving, t, workspace]);
+
+  const syncToDev = useCallback(async (publish: boolean) => {
+    if (!workspace || workspace.kind !== 'dev' || !devEntryReady || devSyncing || saving) return;
+    if (dirty && !(await save())) return;
+    setDevSyncing(true);
+    try {
+      const content = buildContent(workspace.metadataFields, meta, body, fmFormat ?? workspace.profile.frontmatter, fmRaw);
+      const entry = await syncDevArticle(workspace, route.slug, content, publish);
+      setDevEntry(entry);
+      setMeta(prev => ({ ...prev, draft: !entry.published }));
+      setOnDisk(true);
+      setDirty(false);
+      toast.success(entry.published ? t('dev.published') : t('dev.draftSynced'));
+    } catch (error) {
+      toast.error(t('dev.syncFailed'), String(error));
+    } finally {
+      setDevSyncing(false);
+    }
+  }, [body, devEntryReady, devSyncing, dirty, fmFormat, fmRaw, meta, route.slug, save, saving, t, workspace]);
+
+  const chooseDevVersion = useCallback(async (choice: 'local' | 'remote') => {
+    if (!workspace || workspace.kind !== 'dev' || devSyncing) return;
+    setDevSyncing(true);
+    try {
+      const entry = await resolveDevConflict(workspace, route.slug, choice);
+      setDevEntry(entry);
+      if (choice === 'remote') {
+        const content = await invoke<string>('read_post', { mdxPath: workspace.mdxPath, slug: route.slug, profile: workspace.profile });
+        const parsed = parseFrontmatter(content);
+        setBodyRaw(parsed.body);
+        setMeta(parsed.meta);
+        setFmRaw(parsed.raw);
+        setFmFormat(parsed.format);
+        setDirty(false);
+      }
+      toast.success(t('dev.conflictResolved'));
+    } catch (error) {
+      toast.error(t('dev.conflictResolveFailed'), String(error));
+    } finally {
+      setDevSyncing(false);
+    }
+  }, [devSyncing, route.slug, t, workspace]);
+
+  const sendToDev = useCallback(async (publish: boolean) => {
+    if (!workspace || workspace.kind === 'dev' || crossSyncing || crossLinkLoading || saving) return;
+    const target = devTargets.find(w => w.id === crossTargetId);
+    if (!target) return;
+    if (dirty && !(await save())) return;
+    setCrossSyncing(true);
+    try {
+      const content = buildContent(workspace.metadataFields, meta, body, fmFormat ?? workspace.profile.frontmatter, fmRaw);
+      await crosspostDevArticle(workspace, target, route.slug, content, crossCanonical.trim(), publish);
+      setShowCrosspost(false);
+      toast.success(publish ? t('dev.published') : t('dev.draftSynced'));
+    } catch (error) {
+      toast.error(t('dev.syncFailed'), String(error));
+    } finally {
+      setCrossSyncing(false);
+    }
+  }, [body, crossCanonical, crossLinkLoading, crossSyncing, crossTargetId, devTargets, dirty, fmFormat, fmRaw, meta, route.slug, save, saving, t, workspace]);
 
   // Leaving with unsaved edits used to drop them silently; save first.
   const goBack = useCallback(async () => {
@@ -180,15 +275,26 @@ function EditorScreen({ route }: { route: EditorRoute }) {
   // Shared upload handler: pick a file → upload per workspace storage → return URL
   const handleUploadImage = useCallback(async (): Promise<string | null> => {
     if (!workspace) return null;
+    if (workspace.kind === 'dev' && !s3Ready(workspace.storage.s3)) {
+      const message = t('dev.configureS3First');
+      setUploadMessage(message);
+      toast.error(t('dev.imageUploadFailed'), message);
+      return null;
+    }
     try {
       const filePath = await pickImageFile();
       if (!filePath) return null;
-      const url = await uploadImage(filePath, workspace, route.slug);
+      const uploadWorkspace = workspace.kind === 'dev'
+        ? { ...workspace, storage: { ...workspace.storage, provider: 's3' as const } }
+        : workspace;
+      const url = await uploadImage(filePath, uploadWorkspace, route.slug);
       setUploadMessage(null);
       return url;
     } catch (e) {
       console.error('Upload failed:', e);
-      setUploadMessage(e instanceof Error ? e.message : t('storage.notConfiguredHint'));
+      const message = e instanceof Error ? e.message : t('storage.notConfiguredHint');
+      setUploadMessage(message);
+      if (workspace.kind === 'dev') toast.error(t('dev.imageUploadFailed'), message);
       return null;
     }
   }, [route.slug, t, workspace]);
@@ -264,6 +370,14 @@ function EditorScreen({ route }: { route: EditorRoute }) {
     <div className="flex flex-col h-full overflow-hidden" style={{ background: 'var(--bg)' }}>
       {/* ═══ Header ═══ */}
       <header className="editor-header flex items-center gap-2 px-3 flex-shrink-0 border-b">
+        {workspace.kind === 'dev' && <>
+          {devEntry?.conflict && <span className="text-[12px]" role="status" style={{ color: 'var(--red)' }}>{t('dev.conflict')}</span>}
+          {devEntry?.url && <button type="button" className="mac-btn flex-shrink-0" onClick={() => void openUrl(devEntry.url!)}>{t('dev.viewOnDev')}</button>}
+          <button type="button" className="mac-btn flex-shrink-0" disabled={!devEntryReady || devSyncing || saving || loading || devEntry?.conflict} onClick={() => void syncToDev(devEntry?.published ?? false)}>
+            {devSyncing ? t('dev.syncing') : devEntry?.published ? t('dev.syncChanges') : t('dev.saveDraft')}
+          </button>
+          {!devEntry?.published && <button type="button" className="mac-btn mac-btn-fun flex-shrink-0" disabled={!devEntryReady || devSyncing || saving || loading || devEntry?.conflict} onClick={() => void syncToDev(true)}>{t('dev.publish')}</button>}
+        </>}
         <button
           onClick={() => void goBack()}
           className="editor-back-btn flex items-center gap-2 flex-shrink-0"
@@ -339,6 +453,11 @@ function EditorScreen({ route }: { route: EditorRoute }) {
         <ActionMenu
           label={t('posts.actions.more')}
           items={[
+            ...(workspace.kind !== 'dev' && devTargets.length > 0 ? [{
+              label: t('dev.sendToDev'),
+              icon: <IconCheck size={14} />,
+              onSelect: () => { setCrossTargetId(devTargets[0].id); setShowCrosspost(true); },
+            }] : []),
             ...(onDisk ? [{
               label: t('posts.actions.reveal'),
               icon: <IconFolder size={14} />,
@@ -348,17 +467,24 @@ function EditorScreen({ route }: { route: EditorRoute }) {
                   .catch(e => toast.error(t('posts.actions.revealFailed'), String(e)));
               },
             }] : []),
-            {
+            ...((workspace.kind !== 'dev' || (devEntryReady && !devEntry)) ? [{
               label: onDisk ? t('posts.actions.delete') : t('posts.actions.discard'),
               icon: <IconTrash size={14} />,
               danger: true,
               separated: onDisk,
               onSelect: () => void removePost(),
-            },
+            }] : []),
           ]}
         />
       </header>
+      {workspace.kind === 'dev' && devEntry?.conflict && <div className="flex items-center gap-3 px-4 py-2 flex-wrap border-b" style={{ background: 'var(--callout-bg)', color: 'var(--text)' }} role="alert">
+        <span className="text-[12px] flex-1">{t('dev.conflictHint')}</span>
+        <button type="button" className="mac-btn mac-btn-sm" disabled={devSyncing} onClick={() => void chooseDevVersion('remote')}>{t('dev.useDevVersion')}</button>
+        <button type="button" className="mac-btn mac-btn-sm" disabled={devSyncing} onClick={() => void chooseDevVersion('local')}>{t('dev.keepLocalVersion')}</button>
+      </div>}
       {confirmationDialog}
+      {showCrosspost && <CrosspostDialog targets={devTargets} targetId={crossTargetId} canonicalUrl={crossCanonical} alreadyPublished={crossPublished} busy={crossSyncing || crossLinkLoading}
+        onTargetChange={setCrossTargetId} onCanonicalChange={setCrossCanonical} onClose={() => setShowCrosspost(false)} onSend={publish => void sendToDev(publish)} />}
 
       {/* ═══ Body ═══ */}
       {loading ? (
@@ -383,6 +509,7 @@ function EditorScreen({ route }: { route: EditorRoute }) {
               body={body}
               slug={route.slug}
               onUploadImage={handleUploadImage}
+              devMode={workspace.kind === 'dev'}
             />
           )}
 

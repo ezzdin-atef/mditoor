@@ -17,7 +17,7 @@
 
 ---
 
-Mditoor is a desktop app (Tauri + React + Rust) for writing posts in your static site's repository. It edits plain `.md` / `.mdx` files in place, gives you a form for frontmatter, manages images, and handles git — so you can write, commit, and publish without a terminal.
+Mditoor is a desktop app (Tauri + React + Rust) for writing in a static site's repository or directly on DEV.to. Local project workspaces edit plain `.md` / `.mdx` files in place, manage images, and handle git. DEV workspaces keep local Markdown drafts and sync articles to your DEV account.
 
 It is designed for people who write in **both Arabic and English**: text direction is detected per block, and the UI itself is available in English, Arabic, and French.
 
@@ -34,8 +34,16 @@ It is designed for people who write in **both Arabic and English**: text directi
 - **Asset gallery** — see every image in a workspace and which ones are unused
 - **SEO panel** — quick checks on a post before you publish it
 - **Ideas board** — capture post ideas and turn them into drafts
+- **DEV.to workspaces** — connect an account, import existing articles, write offline, sync drafts, and publish without a personal site
+- **Cross-posting** — send a local project post to a connected DEV account with an optional canonical URL
 - **Command palette** — `Ctrl/Cmd + K` to jump anywhere
-- **Local-first** — no account, no telemetry, no cloud sync; your files never leave your machine unless you push or upload them
+- **Local-first** — local drafts remain available offline; posts go to DEV only when you choose to sync or publish
+
+### DEV.to workspaces
+
+Create a workspace and choose **DEV.to**, then paste an API key from your [DEV settings](https://dev.to/settings/extensions). Mditoor verifies the account and keeps the key encrypted in its local app data. Existing articles are imported when the workspace refreshes. New drafts save locally first; **Save to DEV** and **Publish on DEV** are explicit actions in the editor. If both copies change, the editor asks which version to keep.
+
+DEV's documented article API accepts Markdown and public image URLs. In a DEV workspace, configure an S3 or compatible bucket under **Settings → Image uploads to DEV** to upload cover and inline images from your computer. The objects must be publicly readable, either through the bucket URL or a public URL prefix. Existing cover images appear as previews and can be replaced with a new upload. Convert MDX components and local image paths before syncing. Existing drafts are imported through DEV's older authenticated article list because its current v1 list omits Markdown. Removing a DEV workspace removes its saved API key but keeps local drafts in app data.
 
 <!-- TODO: add a screenshot or GIF here, e.g. docs/screenshot.png -->
 
@@ -216,11 +224,22 @@ Contributions of all sizes are welcome — bug reports, docs, translations, fram
 
 ## Releasing (maintainers)
 
-1. Push the commit you want to release.
-2. On GitHub, publish a release with a tag of the form `vMAJOR.MINOR.PATCH` (e.g. `v1.2.3`).
-3. The **Release Windows app** workflow builds that tag and attaches `Mditoor-Setup-1.2.3-Windows-x64.exe` to the release.
+From a clean `main`:
 
-The release tag is the source of truth for the app version.
+```bash
+pnpm release patch        # or minor / major / an explicit version like 2.1.0-beta.1
+```
+
+This bumps the version in `package.json`, `Cargo.toml` and `Cargo.lock`, commits `chore(release): vX.Y.Z`, tags it and pushes. The tag starts the **Release Windows app** workflow, which:
+
+1. Checks the tag matches `package.json` (fails otherwise).
+2. Creates a draft release with a changelog grouped from `feat:` / `fix:` commits since the previous tag.
+3. Builds and uploads `Mditoor-Setup-X.Y.Z-Windows-x64.exe` plus the signed `latest.json` for the in-app updater.
+4. Publishes the release. Versions with a `-suffix` are marked pre-release, so the updater does not offer them to stable users.
+
+Use `--dry-run` to preview the next version, or `--no-push` to commit and tag without pushing.
+
+`package.json` is the single source of truth for the version; `tauri.conf.json` reads it, so the version shown in the app always matches.
 
 ## License
 

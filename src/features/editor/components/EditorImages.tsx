@@ -6,7 +6,7 @@ import { IconAlert, IconCopy, IconFolder, IconImage, IconLink, IconMinus, IconPe
 import { toast } from '../../../components/Toast';
 import { formatBytes } from '../../../lib/ui';
 import { invalidateImages, resolveImage, type ResolvedImage } from '../../assets/imageResolve';
-import { optimizeImage, pickImageFile, uploadImage } from '../../assets/imageUpload';
+import { optimizeImage, pickImageFile, s3Ready, uploadImage } from '../../assets/imageUpload';
 import type { Workspace } from '../../workspace/types';
 
 /* ─── Context ────────────────────────────────────────────────────────── */
@@ -206,9 +206,15 @@ function ImageViewer({ request, onClose }: { request: ViewerRequest; onClose: ()
 
   // Copies the chosen file into the project (per storage settings) and points the post at it.
   const locate = () => run(async () => {
+    if (ctx.workspace.kind === 'dev' && !s3Ready(ctx.workspace.storage.s3)) {
+      throw new Error(t('dev.configureS3First'));
+    }
     const file = await pickImageFile();
     if (!file || !request.onReplaceSrc) return;
-    const url = await uploadImage(file, ctx.workspace, ctx.slug);
+    const uploadWorkspace = ctx.workspace.kind === 'dev'
+      ? { ...ctx.workspace, storage: { ...ctx.workspace.storage, provider: 's3' as const } }
+      : ctx.workspace;
+    const url = await uploadImage(file, uploadWorkspace, ctx.slug);
     request.onReplaceSrc(url);
     ctx.refresh();
     ctx.openViewer({ ...request, src: url });

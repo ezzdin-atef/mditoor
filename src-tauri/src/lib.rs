@@ -771,6 +771,117 @@ fn write_app_data(file: String, content: String) -> Result<(), String> {
     fs::write(&path, content).map_err(|e| e.to_string())
 }
 
+fn dev_account_file(workspace_id: &str) -> Result<String, String> {
+    if workspace_id.is_empty() || !workspace_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+        return Err("Invalid workspace ID".into());
+    }
+    Ok(format!("dev/{workspace_id}/account.json"))
+}
+
+fn dev_workspace_dir(workspace_id: String) -> Result<String, String> {
+    dev_account_file(&workspace_id)?;
+    let path = app_data_path(&format!("dev/{workspace_id}/posts"))?;
+    fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+fn dev_disconnect(workspace_id: String) -> Result<(), String> {
+    let path = app_data_path(&dev_account_file(&workspace_id)?)?;
+    if path.exists() { fs::remove_file(path).map_err(|e| e.to_string())?; }
+    Ok(())
+}
+
+fn dev_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .user_agent("Mditoor/0.1")
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .map_err(|e| e.to_string())
+}
+
+fn dev_api_key(workspace_id: &str) -> Result<String, String> {
+    let raw = read_app_data(dev_account_file(workspace_id)?)?;
+    if raw.is_empty() { return Err("DEV account is not connected".into()); }
+    let blob: EncryptedConfigBlob = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+    let value = decrypt_storage_blob(blob)?;
+    value.as_str().map(str::to_owned).ok_or_else(|| "Invalid DEV account data".into())
+}
+
+async fn dev_response(request: reqwest::RequestBuilder) -> Result<serde_json::Value, String> {
+    let response = request.send().await.map_err(|e| e.to_string())?;
+    let status = response.status();
+    let body = response.text().await.map_err(|e| e.to_string())?;
+    if !status.is_success() {
+        return Err(dev_http_error(status, &body));
+    }
+    serde_json::from_str(&body).map_err(|e| e.to_string())
+}
+
+fn dev_http_error(status: reqwest::StatusCode, body: &str) -> String {
+    let message = serde_json::from_str::<serde_json::Value>(body).ok()
+        .and_then(|v| v.get("error").and_then(|e| e.as_str()).map(str::to_owned))
+        .unwrap_or_else(|| body.chars().take(240).collect());
+    let message = if message.trim().is_empty() {
+        status.canonical_reason().unwrap_or("Request failed").to_owned()
+    } else {
+        message
+    };
+    format!("DEV HTTP {}: {}", status.as_u16(), message)
+}
+
+async fn dev_connect(workspace_id: String, api_key: String, expected_username: Option<String>) -> Result<serde_json::Value, String> {
+    dev_account_file(&workspace_id)?;
+    let key = api_key.trim();
+    if key.is_empty() { return Err("Enter a DEV API key".into()); }
+    let user = dev_response(dev_client()?
+        .get("https://dev.to/api/users/me")
+        .header("api-key", key)
+        .header("accept", "application/vnd.forem.api-v1+json"))
+        .await?;
+    if let Some(expected) = expected_username {
+        if user.get("username").and_then(|v| v.as_str()) != Some(expected.as_str()) {
+            return Err("This API key belongs to a different DEV account".into());
+        }
+    }
+    let blob = encrypt_storage_value(&serde_json::Value::String(key.to_owned()))?;
+    write_app_data(dev_account_file(&workspace_id)?, serde_json::to_string(&blob).map_err(|e| e.to_string())?)?;
+    Ok(user)
+}
+
+async fn dev_list_articles(workspace_id: String, page: u32) -> Result<serde_json::Value, String> {
+    let key = dev_api_key(&workspace_id)?;
+    // The documented v0 authenticated list includes body_markdown for drafts;
+    // the v1 index representation omits it, so it cannot hydrate local copies.
+    dev_response(dev_client()?
+        .get("https://dev.to/api/articles/me/all")
+        .query(&[("page", page.max(1)), ("per_page", 100)])
+        .header("api-key", key))
+        .await
+}
+
+async fn dev_get_article(workspace_id: String, article_id: u64) -> Result<serde_json::Value, String> {
+    let key = dev_api_key(&workspace_id)?;
+    dev_response(dev_client()?
+        .get(format!("https://dev.to/api/articles/{article_id}"))
+        .header("api-key", key))
+        .await
+}
+
+async fn dev_upsert_article(workspace_id: String, article_id: Option<u64>, article: serde_json::Value) -> Result<serde_json::Value, String> {
+    let key = dev_api_key(&workspace_id)?;
+    let client = dev_client()?;
+    let request = match article_id {
+        Some(id) => client.put(format!("https://dev.to/api/articles/{id}")),
+        None => client.post("https://dev.to/api/articles"),
+    };
+    dev_response(request
+        .header("api-key", key)
+        .header("accept", "application/vnd.forem.api-v1+json")
+        .header("content-type", "application/json")
+        .body(serde_json::json!({"article": article}).to_string()))
+        .await
+}
+
 // ═══ Git ═════════════════════════════════════════════════════════════════════
 
 #[derive(serde::Serialize)]
@@ -1655,6 +1766,8 @@ mod cmd {
     blocking!(write_workspace_config(mdx_path: String, config: String) -> ());
     blocking!(read_app_data(file: String) -> String);
     blocking!(write_app_data(file: String, content: String) -> ());
+    blocking!(dev_workspace_dir(workspace_id: String) -> String);
+    blocking!(dev_disconnect(workspace_id: String) -> ());
     blocking!(git_status(mdx_path: String) -> GitStatus);
     blocking!(git_log(mdx_path: String, limit: Option<u32>) -> Vec<GitCommit>);
     blocking!(git_branches(mdx_path: String) -> Vec<GitBranch>);
@@ -1686,6 +1799,26 @@ mod cmd {
     blocking!(delete_post(mdx_path: String, slug: String, profile: Option<PostProfile>) -> ());
     blocking!(config_locations(workspace_paths: Vec<String>) -> ConfigLocations);
     blocking!(write_ideas(mdx_path: String, content: String) -> ());
+
+    #[tauri::command]
+    pub(crate) async fn dev_connect(workspace_id: String, api_key: String, expected_username: Option<String>) -> Result<serde_json::Value, String> {
+        super::dev_connect(workspace_id, api_key, expected_username).await
+    }
+
+    #[tauri::command]
+    pub(crate) async fn dev_list_articles(workspace_id: String, page: u32) -> Result<serde_json::Value, String> {
+        super::dev_list_articles(workspace_id, page).await
+    }
+
+    #[tauri::command]
+    pub(crate) async fn dev_get_article(workspace_id: String, article_id: u64) -> Result<serde_json::Value, String> {
+        super::dev_get_article(workspace_id, article_id).await
+    }
+
+    #[tauri::command]
+    pub(crate) async fn dev_upsert_article(workspace_id: String, article_id: Option<u64>, article: serde_json::Value) -> Result<serde_json::Value, String> {
+        super::dev_upsert_article(workspace_id, article_id, article).await
+    }
 
     /// Lets the webview load files under `path` through the asset protocol
     /// (thumbnails and covers stream straight from disk instead of base64 over IPC).
@@ -1725,6 +1858,14 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            #[cfg(desktop)]
+            {
+                app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+                app.handle().plugin(tauri_plugin_process::init())?;
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             cmd::list_mdx_slugs,
             cmd::list_posts,
@@ -1738,6 +1879,12 @@ pub fn run() {
             cmd::write_workspace_config,
             cmd::read_app_data,
             cmd::write_app_data,
+            cmd::dev_workspace_dir,
+            cmd::dev_disconnect,
+            cmd::dev_connect,
+            cmd::dev_list_articles,
+            cmd::dev_get_article,
+            cmd::dev_upsert_article,
             cmd::git_status,
             cmd::git_log,
             cmd::git_branches,
@@ -1778,6 +1925,42 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dev_client_identifies_itself_on_connection_requests() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut bytes = [0u8; 4096];
+            let count = stream.read(&mut bytes).unwrap();
+            stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}").unwrap();
+            String::from_utf8_lossy(&bytes[..count]).to_ascii_lowercase()
+        });
+        tauri::async_runtime::block_on(async {
+            dev_client().unwrap()
+                .get(format!("http://{address}/api/users/me"))
+                .header("api-key", "test-key")
+                .header("accept", "application/vnd.forem.api-v1+json")
+                .send().await.unwrap();
+        });
+        let request = server.join().unwrap();
+        assert!(request.contains("user-agent: mditoor/0.1\r\n"), "missing DEV user-agent");
+    }
+
+    #[test]
+    fn dev_empty_403_has_a_readable_error() {
+        assert_eq!(dev_http_error(reqwest::StatusCode::FORBIDDEN, ""), "DEV HTTP 403: Forbidden");
+    }
+
+    #[test]
+    fn dev_account_paths_reject_traversal() {
+        assert_eq!(dev_account_file("abc-123").unwrap(), "dev/abc-123/account.json");
+        assert!(dev_account_file("../other").is_err());
+        assert!(dev_account_file("a\\b").is_err());
+        assert!(dev_account_file("").is_err());
+    }
 
     #[test]
     fn splits_frontmatter_with_crlf() {

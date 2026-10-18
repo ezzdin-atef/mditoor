@@ -30,7 +30,7 @@ export interface PostCardData {
 }
 
 const COVER_KEYS = [
-  'cover', 'coverImage', 'cover_image', 'image', 'heroImage', 'hero', 'hero_image',
+  'cover', 'coverImage', 'cover_image', 'main_image', 'image', 'heroImage', 'hero', 'hero_image',
   'thumbnail', 'thumb', 'banner', 'featuredImage', 'featured_image', 'ogImage', 'og_image',
 ];
 const DESC_KEYS = ['description', 'excerpt', 'summary', 'subtitle', 'metaDescription'];

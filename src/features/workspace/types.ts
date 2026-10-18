@@ -144,6 +144,8 @@ export interface ProjectInfo {
 
 export interface Workspace {
   id: string;
+  kind?: 'local' | 'dev';
+  devUsername?: string;
   name: string;
   icon: string;
   /** Posts folder (absolute). All post, git and config commands run against it. */

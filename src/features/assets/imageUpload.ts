@@ -33,7 +33,7 @@ export function optimizeImage(path: string, storage: StorageConfig): Promise<Opt
 }
 
 export function s3Ready(s3: S3StorageConfig): boolean {
-  return Boolean(s3.bucket && s3.region && s3.accessKey && s3.secretKey);
+  return Boolean(s3.bucket.trim() && s3.region.trim() && s3.accessKey.trim() && s3.secretKey.trim());
 }
 
 /** Absolute folder that `public`-mode images are copied into, or null without a project root. */
@@ -76,10 +76,13 @@ async function saveLocal(filePath: string, workspace: UploadWorkspace, slug?: st
 async function uploadToS3(filePath: string, storage: StorageConfig): Promise<string> {
   const { s3 } = storage;
   if (!s3Ready(s3)) {
-    throw new Error('Configure S3 storage before inserting images. Open the workspace Settings tab and add your bucket, region, access key, and secret key.');
+    throw new Error('Configure S3 image storage in workspace Settings before uploading. Add your bucket, region, access key, and secret key.');
   }
   const prefix = trimSlash(s3.keyPrefix);
-  const filename = basename(filePath);
+  // A fresh key avoids overwriting another article's image with the same filename.
+  // Keep the key URL-safe for the S3 signer and the public Markdown URL.
+  const safeName = basename(filePath).normalize('NFKD').replace(/[^a-zA-Z0-9._-]/g, '-').slice(-80) || 'image';
+  const filename = `${crypto.randomUUID()}-${safeName}`;
   const key = prefix ? `${prefix}/${filename}` : filename;
   const rawUrl = await invoke<string>('upload_to_s3', {
     filePath,

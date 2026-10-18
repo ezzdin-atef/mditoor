@@ -6,7 +6,8 @@ import { useStore } from './features/workspace/store';
 import { useSettings } from './features/settings/store';
 import { toCardData, type PostSummary } from './features/posts/postMeta';
 import { useRouter } from './router';
-import { IconArrowLeft, IconBulb, IconFile, IconSearch, IconSettings, IconSparkles } from './components/Icons';
+import { IconArrowLeft, IconBulb, IconFile, IconSearch, IconRefresh, IconSettings, IconSparkles } from './components/Icons';
+import { useUpdater } from './features/updater/store';
 import { useIdeas } from './features/ideas/store';
 import { toast } from './components/Toast';
 import { MOD } from './lib/ui';
@@ -93,6 +94,15 @@ export function CommandPalette() {
         id: 'act-theme', group: t('palette.groups.actions'),
         label: theme === 'dark' ? t('palette.lightMode') : t('palette.darkMode'),
         icon: <IconSparkles size={15} />, action: () => update('theme', theme === 'dark' ? 'light' : 'dark'),
+      },
+      {
+        id: 'act-updates', group: t('palette.groups.actions'), label: t('updater.check'),
+        icon: <IconRefresh size={15} />,
+        action: () => {
+          useUpdater.setState({ reveal: true });
+          navigate({ page: 'settings' });
+          void useUpdater.getState().checkForUpdates();
+        },
       },
     ];
     const ws: PaletteItem[] = workspaces.map(w => ({

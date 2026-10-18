@@ -99,8 +99,9 @@ interface Store {
   activeId: string | null;
   hydrateWorkspaces: (stored: StoredWorkspace[]) => void;
   addWorkspace: (input: NewWorkspace) => Promise<void>;
+  addDevWorkspace: (id: string, username: string) => Promise<void>;
   updateWorkspace: (id: string, updates: Partial<Pick<Workspace, 'name' | 'mdxPath' | 'rootPath' | 'icon'>>) => Promise<void>;
-  deleteWorkspace: (id: string) => void;
+  deleteWorkspace: (id: string) => Promise<void>;
   setActive: (id: string | null) => Promise<void>;
   addField: (workspaceId: string, field: Omit<MetadataField, 'id'>) => Promise<void>;
   updateField: (workspaceId: string, fieldId: string, updates: Partial<Omit<MetadataField, 'id'>>) => Promise<void>;
@@ -149,6 +150,30 @@ export const useStore = create<Store>((set, get) => ({
     set({ workspaces, activeId: w.id });
   },
 
+  addDevWorkspace: async (id, username) => {
+    const mdxPath = await invoke<string>('dev_workspace_dir', { workspaceId: id });
+    const w: Workspace = {
+      id, kind: 'dev', devUsername: username,
+      name: `DEV · @${username}`, icon: '✍️', mdxPath,
+      colorIdx: nextColor++ % 8, createdAt: new Date().toISOString(),
+      metadataFields: [
+        { id: 'dev-title', name: 'title', type: 'text', required: true },
+        { id: 'dev-description', name: 'description', type: 'text', required: false },
+        { id: 'dev-tags', name: 'tags', type: 'tags', required: false },
+        { id: 'dev-cover', name: 'main_image', type: 'image', required: false },
+        { id: 'dev-series', name: 'series', type: 'text', required: false },
+        { id: 'dev-canonical', name: 'canonical_url', type: 'text', required: false },
+        { id: 'dev-draft', name: 'draft', type: 'boolean', required: false },
+      ],
+      storage: { ...DEFAULT_STORAGE, provider: 's3' },
+      profile: { ...FRAMEWORK_PRESETS.generic.profile, layout: 'flat', extension: '.md' },
+    };
+    await writeConfig(w);
+    const workspaces = [...get().workspaces, w];
+    save(workspaces);
+    set({ workspaces, activeId: id });
+  },
+
   updateWorkspace: async (id, updates) => {
     const current = get().workspaces.find(w => w.id === id);
     if (!current) return;
@@ -174,7 +199,9 @@ export const useStore = create<Store>((set, get) => ({
     }
   },
 
-  deleteWorkspace: (id) => {
+  deleteWorkspace: async (id) => {
+    const removed = get().workspaces.find(w => w.id === id);
+    if (removed?.kind === 'dev') await invoke('dev_disconnect', { workspaceId: id });
     const workspaces = get().workspaces.filter(w => w.id !== id);
     save(workspaces);
     const activeId = get().activeId === id ? (workspaces[0]?.id ?? null) : get().activeId;
@@ -188,10 +215,13 @@ export const useStore = create<Store>((set, get) => ({
     if (!workspace) return;
     const { metadataFields, storage, profile } = await readConfig(workspace.mdxPath);
     // Workspaces created before project roots existed: find the root once and remember it.
-    const rootPath = workspace.rootPath
+    const rootPath = workspace.kind === 'dev' ? undefined : workspace.rootPath
       ?? await detectProject(workspace.mdxPath).then(p => p.root ?? undefined).catch(() => undefined);
+    const fields = workspace.kind === 'dev'
+      ? metadataFields.map(field => field.name === 'main_image' ? { ...field, type: 'image' as const } : field)
+      : metadataFields;
     const workspaces = get().workspaces.map(w =>
-      w.id === id ? { ...w, metadataFields, storage, profile, rootPath } : w,
+      w.id === id ? { ...w, metadataFields: fields, storage, profile, rootPath } : w,
     );
     set({ workspaces });
     if (rootPath !== workspace.rootPath) save(workspaces);
@@ -246,9 +276,9 @@ export const useStore = create<Store>((set, get) => ({
     const workspaces = get().workspaces.map(w =>
       w.id === workspaceId ? { ...w, storage } : w,
     );
-    set({ workspaces });
     const ws = workspaces.find(w => w.id === workspaceId);
     if (ws) await writeConfig(ws);
+    set({ workspaces });
   },
 
   updateProfile: async (workspaceId, profile) => {

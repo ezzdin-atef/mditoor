@@ -18,7 +18,7 @@ export function usePostDelete() {
   const { confirm, confirmationDialog } = useConfirmDialog();
 
   const deletePost = useCallback(async (
-    { mdxPath, profile }: Pick<Workspace, 'mdxPath' | 'profile'>,
+    { mdxPath, profile, kind }: Pick<Workspace, 'mdxPath' | 'profile' | 'kind'>,
     slug: string,
     title: string,
   ): Promise<boolean> => {
@@ -41,7 +41,7 @@ export function usePostDelete() {
               </span>
             </span>
           )}
-          <span className="block mt-2" style={{ color: 'var(--text-faint)' }}>{t('posts.deleteGitHint')}</span>
+          {kind !== 'dev' && <span className="block mt-2" style={{ color: 'var(--text-faint)' }}>{t('posts.deleteGitHint')}</span>}
         </>
       ),
       confirmLabel: t('posts.deleteConfirmButton'),

@@ -28,6 +28,7 @@ export interface Settings {
   arabicFont: ArabicFont;
   autoSave: boolean;
   autoSaveInterval: AutoSaveInterval;
+  autoCheckUpdates: boolean;
 }
 
 interface SettingsStore extends Settings {
@@ -47,6 +48,7 @@ const DEFAULTS: Settings = {
   arabicFont: 'noto-sans-arabic',
   autoSave: true,
   autoSaveInterval: 5000,
+  autoCheckUpdates: true,
 };
 
 function loadFromLS(): Settings {

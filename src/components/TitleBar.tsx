@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useTranslation } from 'react-i18next';
 import { AppLogo } from './AppLogo';
+import { useRouter } from '../router';
+import { hasPendingUpdate, useUpdater } from '../features/updater/store';
 
 /** macOS keeps its native traffic-light title bar; Windows/Linux use this one. */
 export const USE_CUSTOM_TITLEBAR =
@@ -31,6 +33,7 @@ export function TitleBar({ title, tone }: { title: string; tone: 'app' | 'page' 
     <div className={`titlebar titlebar-${tone}`} data-tauri-drag-region>
       <AppLogo size={16} className="titlebar-logo" />
       <span className="titlebar-title" data-tauri-drag-region>{title}</span>
+      <UpdatePill />
       <div className="titlebar-controls">
         <button className="titlebar-btn" onClick={() => void win().minimize()} aria-label={t('window.minimize')} title={t('window.minimize')}>
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 5h10" stroke="currentColor" strokeWidth="1" /></svg>
@@ -50,5 +53,24 @@ export function TitleBar({ title, tone }: { title: string; tone: 'app' | 'page' 
         </button>
       </div>
     </div>
+  );
+}
+
+function UpdatePill() {
+  const { t } = useTranslation();
+  const { navigate } = useRouter();
+  const pending = useUpdater(hasPendingUpdate);
+  const version = useUpdater(s => s.update?.version);
+  if (!pending) return null;
+  return (
+    <button
+      type="button"
+      className="titlebar-update"
+      onClick={() => { useUpdater.setState({ reveal: true }); navigate({ page: 'settings' }); }}
+      title={t('updater.available', { version })}
+    >
+      <span className="update-dot" aria-hidden="true" />
+      {t('updater.pill')}
+    </button>
   );
 }

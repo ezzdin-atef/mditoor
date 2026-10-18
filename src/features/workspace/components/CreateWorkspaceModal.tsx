@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useTranslation } from 'react-i18next';
 import { detectProject, useStore } from '../store';
@@ -12,6 +14,8 @@ import { WORKSPACE_EMOJIS } from './WorkspaceSettingsTab';
 const folderName = (p: string) => p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? '';
 
 export function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
+  const [mode, setMode] = useState<'local' | 'dev'>('local');
+  const [apiKey, setApiKey] = useState('');
   const [name, setName] = useState('');
   // The folder the user picked: either the project root or the posts folder itself.
   const [folder, setFolder] = useState('');
@@ -22,7 +26,7 @@ export function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
   const [icon, setIcon] = useState(WORKSPACE_EMOJIS[0]);
   const [picking, setPicking] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const { addWorkspace } = useStore();
+  const { addWorkspace, addDevWorkspace } = useStore();
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -85,13 +89,24 @@ export function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
   const root = info?.root ?? null;
   const candidates = root ? info!.contentDirs.map(d => ({ ...d, abs: joinPath(root, d.path) })) : [];
   const customContent = isRoot && contentDir !== '' && !candidates.some(c => c.abs === contentDir);
-  const canSubmit = Boolean(name.trim() && mdxPath && !detecting && !submitting);
+  const canSubmit = mode === 'dev'
+    ? Boolean(apiKey.trim() && !submitting)
+    : Boolean(name.trim() && mdxPath && !detecting && !submitting);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
     setSubmitting(true);
     try {
+      if (mode === 'dev') {
+        const id = crypto.randomUUID();
+        const user = await invoke<{ username: string }>('dev_connect', { workspaceId: id, apiKey: apiKey.trim() });
+        if (!user.username) throw new Error(t('dev.invalidAccount'));
+        await addDevWorkspace(id, user.username);
+        toast.success(t('dev.connected', { username: user.username }));
+        onClose();
+        return;
+      }
       await addWorkspace({
         name: name.trim(),
         mdxPath,
@@ -102,7 +117,7 @@ export function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
       toast.success(t('workspace.created', { name: name.trim() }));
       onClose();
     } catch (err) {
-      toast.error(t('workspace.createFailed'), String(err));
+      toast.error(t(mode === 'dev' ? 'dev.connectionFailed' : 'workspace.createFailed'), String(err));
     } finally {
       setSubmitting(false);
     }
@@ -112,12 +127,12 @@ export function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
     <div className="modal-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal mac-sheet" role="dialog" aria-modal="true" aria-labelledby="create-ws-title">
         <div className="px-6 pt-6 pb-4 flex items-start gap-4" style={{ borderBottom: '1px solid var(--border)' }}>
-          <span className="ws-icon ws-icon-lg" style={{ background: 'var(--accent-faint)' }} aria-hidden="true">{icon}</span>
+          <span className="ws-icon ws-icon-lg" style={{ background: 'var(--accent-faint)' }} aria-hidden="true">{mode === 'dev' ? '✍️' : icon}</span>
           <div className="flex-1 min-w-0">
             <h2 id="create-ws-title" className="text-[18px] font-bold" style={{ color: 'var(--text)', letterSpacing: '-0.01em' }}>
               {t('workspace.new')}
             </h2>
-            <p className="text-[12.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{t('workspace.folderHint')}</p>
+            <p className="text-[12.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{mode === 'dev' ? t('dev.workspaceHint') : t('workspace.folderHint')}</p>
           </div>
           <button type="button" onClick={onClose} className="icon-btn" aria-label={t('common.close')}>
             <IconX size={16} />
@@ -125,6 +140,17 @@ export function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 pt-5 pb-6 space-y-5">
+          <div className="mac-segmented" role="radiogroup" aria-label={t('dev.workspaceType')}>
+            <button type="button" role="radio" aria-checked={mode === 'local'} className={`mac-segment flex-1${mode === 'local' ? ' active' : ''}`} onClick={() => setMode('local')}>{t('dev.localProject')}</button>
+            <button type="button" role="radio" aria-checked={mode === 'dev'} className={`mac-segment flex-1${mode === 'dev' ? ' active' : ''}`} onClick={() => setMode('dev')}>DEV.to</button>
+          </div>
+          {mode === 'dev' ? (
+            <div>
+              <label className="field-label" htmlFor="dev-key">{t('dev.apiKey')}</label>
+              <input id="dev-key" type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} autoComplete="off" className="mac-input w-full dir-ltr" placeholder={t('dev.apiKeyPlaceholder')} />
+              <p className="field-hint">{t('dev.apiKeyHelp')}{' '}<button type="button" onClick={() => void openUrl('https://dev.to/settings/extensions')} style={{ color: 'var(--accent)' }}>{t('dev.getApiKey')}</button></p>
+            </div>
+          ) : <>
           <div>
             <label className="field-label">{t('workspace.icon')}</label>
             <div className="flex flex-wrap gap-1.5">
@@ -211,6 +237,7 @@ export function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
             />
           </div>
 
+          </>}
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose} className="mac-btn flex-1" style={{ height: 38 }}>
               {t('common.cancel')}
@@ -221,7 +248,7 @@ export function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
               className="mac-btn mac-btn-fun flex-1"
               style={{ height: 38 }}
             >
-              {t('workspace.create')}
+              {submitting ? t('dev.connecting') : mode === 'dev' ? t('dev.connect') : t('workspace.create')}
             </button>
           </div>
         </form>

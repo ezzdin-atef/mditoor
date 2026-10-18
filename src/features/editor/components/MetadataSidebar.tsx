@@ -18,6 +18,7 @@ interface Props {
   body?: string;
   slug?: string;
   onUploadImage?: () => Promise<string | null>;
+  devMode?: boolean;
 }
 
 export const SIDEBAR_MIN = 240;
@@ -43,7 +44,7 @@ function isFilled(v: MetaValues[string] | undefined) {
 
 /* ─── Shell: resizable, collapsible ──────────────────────────────────── */
 
-export function MetadataSidebar({ fields, values, onChange, body = '', slug = '', onUploadImage }: Props) {
+export function MetadataSidebar({ fields, values, onChange, body = '', slug = '', onUploadImage, devMode = false }: Props) {
   const { t } = useTranslation();
   const { sidebarWidth, sidebarCollapsed, sidebarTab, set } = useViewPrefs();
   const [width, setWidth] = useState(sidebarWidth || SIDEBAR_DEFAULT);
@@ -93,7 +94,7 @@ export function MetadataSidebar({ fields, values, onChange, body = '', slug = ''
         <button className="icon-btn" onClick={() => set('sidebarCollapsed', false)} title={t('meta.expand')} aria-label={t('meta.expand')}>
           <IconChevronRight size={16} mirror />
         </button>
-        <button className="meta-rail-item" onClick={() => { set('sidebarTab', 'meta'); set('sidebarCollapsed', false); }} title={t('metadata.meta')}>
+        <button className="meta-rail-item" onClick={() => { set('sidebarTab', 'meta'); set('sidebarCollapsed', false); }} title={t(devMode ? 'dev.articleDetails' : 'metadata.meta')}>
           <IconLayers size={16} />
           {missingRequired > 0 && <span className="meta-rail-dot" />}
         </button>
@@ -114,7 +115,7 @@ export function MetadataSidebar({ fields, values, onChange, body = '', slug = ''
             className={`mac-segment flex-1${sidebarTab === 'meta' ? ' active' : ''}`}
             onClick={() => set('sidebarTab', 'meta')}
           >
-            <IconLayers size={13} />{t('metadata.meta')}
+            <IconLayers size={13} />{t(devMode ? 'dev.articleDetails' : 'metadata.meta')}
             {fields.length > 0 && (
               <span className={`tab-count${missingRequired ? ' attention' : ''}`}>{filled}/{fields.length}</span>
             )}
@@ -163,6 +164,7 @@ export function MetadataSidebar({ fields, values, onChange, body = '', slug = ''
                 value={values[field.name]}
                 onChange={v => onChange(field.name, v)}
                 onUploadImage={onUploadImage}
+                devCover={devMode && field.name === 'main_image'}
               />
             ))}
           </div>
@@ -386,11 +388,12 @@ function AutoTextarea({ value, onChange, placeholder }: { value: string; onChang
   );
 }
 
-function FieldCard({ field, value, onChange, onUploadImage }: {
+function FieldCard({ field, value, onChange, onUploadImage, devCover = false }: {
   field: MetadataField;
   value: MetaValues[string] | undefined;
   onChange: (v: MetaValues[string]) => void;
   onUploadImage?: () => Promise<string | null>;
+  devCover?: boolean;
 }) {
   const { t } = useTranslation();
   const info = fieldTypeMap[field.type];
@@ -402,7 +405,7 @@ function FieldCard({ field, value, onChange, onUploadImage }: {
       <span className="meta-type" style={{ color, background: `color-mix(in srgb, ${color} 13%, transparent)` }} title={info.label}>
         {info.emoji}
       </span>
-      <span className="text-[12.5px] font-semibold truncate flex-1" style={{ color: 'var(--text)' }}>{field.name}</span>
+      <span className="text-[12.5px] font-semibold truncate flex-1" style={{ color: 'var(--text)' }}>{devCover ? t('dev.coverImage') : field.name}</span>
       {field.required && (
         <span className={`badge ${missing ? 'badge-orange' : ''}`} style={{ height: 18, fontSize: 10 }}>
           {t('metadata.requiredLabel')}
@@ -458,7 +461,7 @@ function FieldCard({ field, value, onChange, onUploadImage }: {
       );
       break;
     case 'image':
-      input = <ImageInput value={value} onChange={onChange} onUploadImage={onUploadImage} />;
+      input = <ImageInput value={value} onChange={onChange} onUploadImage={onUploadImage} devCover={devCover} />;
       break;
     default:
       input = <AutoTextarea value={String(value ?? '')} onChange={v => onChange(v)} placeholder={t('meta.placeholder', { name: field.name })} />;
@@ -510,10 +513,11 @@ function TagsInput({ value, onChange }: { value: MetaValues[string] | undefined;
   );
 }
 
-function ImageInput({ value, onChange, onUploadImage }: {
+function ImageInput({ value, onChange, onUploadImage, devCover = false }: {
   value: MetaValues[string] | undefined;
   onChange: (v: MetaValues[string]) => void;
   onUploadImage?: () => Promise<string | null>;
+  devCover?: boolean;
 }) {
   const { t } = useTranslation();
   const images = useEditorImages();
@@ -536,7 +540,7 @@ function ImageInput({ value, onChange, onUploadImage }: {
       {url ? (
         <button
           type="button"
-          className="meta-image meta-image-open"
+          className={`meta-image meta-image-open${devCover ? ' meta-image-dev-cover' : ''}`}
           onClick={() => images?.openViewer({ src: url, onReplaceSrc: onChange })}
           title={t('viewer.open')}
           aria-label={t('viewer.open')}
@@ -544,25 +548,27 @@ function ImageInput({ value, onChange, onUploadImage }: {
           <ResolvedImg src={url} />
         </button>
       ) : (
-        <div className="meta-image">
+        <div className={`meta-image${devCover ? ' meta-image-dev-cover' : ''}`}>
           <span className="flex flex-col items-center gap-1 text-[11px]" style={{ color: 'var(--text-faint)' }}>
             <IconImage size={18} />{t('meta.noImage')}
           </span>
         </div>
       )}
       <div className="flex gap-1.5">
-        <input
+        {!devCover && <input
           type="text"
           value={url}
           onChange={e => onChange(e.target.value)}
           placeholder={t('meta.imagePlaceholder')}
           className="mac-input meta-input dir-ltr flex-1"
-        />
+        />}
         {onUploadImage && (
           <button type="button" onClick={upload} disabled={busy} className="mac-btn mac-btn-sm" style={{ height: 32 }} title={t('toolbar.uploadImage')}>
             <IconUpload size={13} className={busy ? 'spin' : undefined} />
+            {devCover && <span>{t(url ? 'dev.replaceCover' : 'dev.uploadCover')}</span>}
           </button>
         )}
+        {devCover && url && <button type="button" className="mac-btn mac-btn-sm" style={{ height: 32 }} onClick={() => onChange('')} disabled={busy}>{t('common.remove')}</button>}
       </div>
     </div>
   );

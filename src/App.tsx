@@ -8,6 +8,7 @@ import { WorkspacePage } from './features/workspace/pages/WorkspacePage';
 import { EditorPage } from './features/editor/pages/EditorPage';
 import { SettingsPage } from './features/settings/pages/SettingsPage';
 import { CommandPalette } from './CommandPalette';
+import { useStartupUpdateCheck } from './features/updater/useStartupUpdateCheck';
 import { Toaster } from './components/Toast';
 import { TitleBar, USE_CUSTOM_TITLEBAR } from './components/TitleBar';
 import i18n, { isRtlLanguage } from './i18n';
@@ -92,6 +93,7 @@ export default function App() {
   useLanguageSync();
   useHydrateFromDisk();
   useGlobalShortcuts();
+  useStartupUpdateCheck();
   const { route } = useRouter();
   const title = useWindowTitle();
 

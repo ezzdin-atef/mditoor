@@ -21,6 +21,7 @@ import { IconArrowLeft, IconCheck } from '../../../components/Icons';
 import { toast } from '../../../components/Toast';
 import { CustomSelect } from '../../../components/CustomSelect';
 import { ConfigFilesSection } from '../components/ConfigFilesSection';
+import { UpdatesSection } from '../../updater/UpdatesSection';
 
 type OptionItem<T> = { value: T; label: string };
 
@@ -34,6 +35,7 @@ function snapshotSettings(settings: Settings): Settings {
     arabicFont: settings.arabicFont,
     autoSave: settings.autoSave,
     autoSaveInterval: settings.autoSaveInterval,
+    autoCheckUpdates: settings.autoCheckUpdates,
   };
 }
 
@@ -55,6 +57,7 @@ export function SettingsPage() {
     settings.arabicFont,
     settings.autoSave,
     settings.autoSaveInterval,
+    settings.autoCheckUpdates,
   ]);
 
   const [draft, setDraft] = useState<Settings>(() => persisted);
@@ -163,6 +166,8 @@ export function SettingsPage() {
             <h2 className="text-[26px] font-extrabold" style={{ letterSpacing: '-0.03em' }}>{t('settings.title')}</h2>
             <p className="text-[13.5px] mt-1" style={{ color: 'var(--text-muted)' }}>{t('settings.subtitle')}</p>
           </div>
+
+          <UpdatesSection autoCheck={draft.autoCheckUpdates} onAutoCheckChange={v => set('autoCheckUpdates', v)} />
 
           <Section title={t('settings.appearance')}>
             <div className="px-[18px] pt-4 pb-2">

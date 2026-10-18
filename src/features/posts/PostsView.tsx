@@ -17,6 +17,7 @@ import {
 import { MOD, formatDate, colorFor, relativeTime, useInView } from '../../lib/ui';
 import { toCardData, type PostCardData, type PostSummary } from './postMeta';
 import { NewPostModal } from './NewPostModal';
+import { readDevManifest } from '../dev/devSync';
 
 /* ─── Cover image (lazy, cached) ─────────────────────────────────────── */
 
@@ -189,6 +190,18 @@ export function PostsView({
   const { postsView, postSort, set } = useViewPrefs();
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
+  const [devLinked, setDevLinked] = useState<Set<string>>(new Set());
+  const [devLinksReady, setDevLinksReady] = useState(false);
+
+  useEffect(() => {
+    if (workspace.kind !== 'dev') return;
+    let alive = true;
+    setDevLinksReady(false);
+    readDevManifest(workspace.id)
+      .then(manifest => { if (alive) { setDevLinked(new Set(Object.keys(manifest))); setDevLinksReady(true); } })
+      .catch(() => { if (alive) setDevLinksReady(false); });
+    return () => { alive = false; };
+  }, [workspace.id, workspace.kind, posts]);
 
   useEffect(() => {
     if (openNew) {
@@ -234,7 +247,7 @@ export function PostsView({
           .catch(e => toast.error(t('posts.actions.revealFailed'), String(e)));
       },
     },
-    {
+    ...(workspace.kind === 'dev' && (!devLinksReady || devLinked.has(p.slug)) ? [] : [{
       label: t('posts.actions.delete'),
       icon: <IconTrash size={14} />,
       danger: true,
@@ -242,7 +255,7 @@ export function PostsView({
       onSelect: () => {
         void deletePost(workspace, p.slug, p.title).then(deleted => { if (deleted) onRefresh(); });
       },
-    },
+    }]),
   ];
   const open = (slug: string, isNew = false) =>
     navigate({ page: 'editor', workspaceId: workspace.id, slug, isNew });

@@ -20,6 +20,9 @@ import {
   IconBranch, IconBulb, IconFile, IconFolder, IconImage, IconLayers, IconPlus, IconSearch, IconSettings, IconSliders, IconTrash,
 } from '../../../components/Icons';
 import { MOD } from '../../../lib/ui';
+import { importDevArticles } from '../../dev/devSync';
+import { DevSettings } from '../../dev/DevSettings';
+import { hasPendingUpdate, useUpdater } from '../../updater/store';
 
 type Tab = 'posts' | 'ideas' | 'metadata' | 'git' | 'images' | 'settings';
 const TABS: { id: Tab; icon: typeof IconFile }[] = [
@@ -34,6 +37,7 @@ const TABS: { id: Tab; icon: typeof IconFile }[] = [
 interface GitStatusLite { is_repo: boolean; files: unknown[] }
 
 export function WorkspacePage() {
+  const updatePending = useUpdater(hasPendingUpdate);
   const { workspaces, activeId, setActive, deleteWorkspace } = useStore();
   const { navigate } = useRouter();
   const { t } = useTranslation();
@@ -42,11 +46,13 @@ export function WorkspacePage() {
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [postsError, setPostsError] = useState<string | null>(null);
+  const [devNotice, setDevNotice] = useState<string | null>(null);
   const [newPostOpen, setNewPostOpen] = useState(false);
   const [gitChanges, setGitChanges] = useState<number | null>(null);
   const { confirm, confirmationDialog } = useConfirmDialog();
 
   const active = workspaces.find(w => w.id === activeId) ?? null;
+  const visibleTabs = active?.kind === 'dev' ? TABS.filter(tab => ['posts', 'ideas', 'settings'].includes(tab.id)) : TABS;
   const ideas = useIdeas(s => (active ? s.byPath[active.mdxPath] : undefined));
   const openIdeas = ideas?.filter(i => i.status !== 'drafted').length ?? 0;
 
@@ -70,14 +76,28 @@ export function WorkspacePage() {
       .catch(() => setGitChanges(null));
   }, []);
 
+  const refreshDev = useCallback(async (workspace: typeof active) => {
+    if (!workspace) return;
+    setDevNotice(null);
+    try {
+      const result = await importDevArticles(workspace);
+      if (result.conflicts || result.skipped) setDevNotice(t('dev.importNotice', result));
+    } catch (error) {
+      setDevNotice(t('dev.offlineNotice', { error: String(error) }));
+    } finally {
+      fetchPosts(workspace.mdxPath, workspace.profile);
+    }
+  }, [fetchPosts, t]);
+
   useEffect(() => {
     if (!active) { setPosts([]); setPostsError(null); setGitChanges(null); return; }
     setPosts([]);
     fetchPosts(active.mdxPath, active.profile);
-    fetchGitCount(active.mdxPath);
+    if (active.kind === 'dev') void refreshDev(active);
+    else fetchGitCount(active.mdxPath);
   // The profile is read from .mditoor.json after activation, so re-list when its layout arrives.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active?.id, active?.mdxPath, active?.profile.layout, active?.profile.extension, fetchPosts, fetchGitCount]);
+  }, [active?.id, active?.mdxPath, active?.profile.layout, active?.profile.extension, fetchPosts, fetchGitCount, refreshDev]);
 
   // Pick up edits made outside the app when the window regains focus.
   useEffect(() => {
@@ -88,7 +108,7 @@ export function WorkspacePage() {
       if (Date.now() - last < 5000) return;
       last = Date.now();
       fetchPosts(active.mdxPath, active.profile);
-      if (activeTab !== 'git') fetchGitCount(active.mdxPath);
+      if (active.kind !== 'dev' && activeTab !== 'git') fetchGitCount(active.mdxPath);
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
@@ -108,24 +128,27 @@ export function WorkspacePage() {
         e.preventDefault();
         setShowCreate(true);
       }
-      if (/^[1-6]$/.test(e.key) && active) {
+      if (/^[1-6]$/.test(e.key) && active && Number(e.key) <= visibleTabs.length) {
         e.preventDefault();
-        setActiveTab(TABS[Number(e.key) - 1].id);
+        setActiveTab(visibleTabs[Number(e.key) - 1].id);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [active]);
+  }, [active, visibleTabs]);
 
   const handleDelete = async () => {
     if (!active) return;
     const confirmed = await confirm({
       title: t('workspace.delete'),
-      message: t('workspace.deleteConfirm', { name: active.name }),
+      message: active.kind === 'dev' ? t('dev.deleteWorkspaceConfirm', { name: active.name }) : t('workspace.deleteConfirm', { name: active.name }),
       confirmLabel: t('common.delete'),
       cancelLabel: t('common.cancel'),
     });
-    if (confirmed) deleteWorkspace(active.id);
+    if (confirmed) {
+      try { await deleteWorkspace(active.id); }
+      catch (error) { setDevNotice(String(error)); }
+    }
   };
 
   const onNewOpened = useCallback(() => setNewPostOpen(false), []);
@@ -196,10 +219,15 @@ export function WorkspacePage() {
         </div>
 
         <div className="px-3 py-3" style={{ borderTop: '1px solid var(--sb-border)' }}>
-          <button onClick={() => navigate({ page: 'settings' })} className="mac-sidebar-item">
+          <button
+            onClick={() => { if (updatePending) useUpdater.setState({ reveal: true }); navigate({ page: 'settings' }); }}
+            className="mac-sidebar-item"
+          >
             <span className="ws-icon" style={{ color: 'var(--sb-muted)' }}><IconSettings size={16} /></span>
             <span className="flex-1" style={{ color: 'var(--sb-text)' }}>{t('nav.settings')}</span>
-            <kbd>{MOD},</kbd>
+            {updatePending
+              ? <span className="update-dot" role="img" aria-label={t('updater.pill')} title={t('updater.pill')} />
+              : <kbd>{MOD},</kbd>}
           </button>
         </div>
       </aside>
@@ -217,8 +245,8 @@ export function WorkspacePage() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <h1 className="page-title truncate">{active.name}</h1>
-                  <p className="text-[12px] mt-1 truncate mac-input-mono flex items-center gap-1.5" style={{ color: 'var(--text-faint)' }} title={active.mdxPath}>
-                    <IconFolder size={12} />{active.mdxPath}
+                  <p className="text-[12px] mt-1 truncate mac-input-mono flex items-center gap-1.5" style={{ color: 'var(--text-faint)' }} title={active.kind === 'dev' ? `@${active.devUsername}` : active.mdxPath}>
+                    {active.kind === 'dev' ? `DEV.to / @${active.devUsername}` : <><IconFolder size={12} />{active.mdxPath}</>}
                   </p>
                 </div>
                 <button
@@ -232,7 +260,7 @@ export function WorkspacePage() {
               </div>
 
               <nav className="tab-strip" role="tablist">
-                {TABS.map(({ id, icon: Icon }, i) => {
+                {visibleTabs.map(({ id, icon: Icon }, i) => {
                   const isActiveTab = activeTab === id;
                   const badge = badgeFor(id);
                   return (
@@ -255,13 +283,14 @@ export function WorkspacePage() {
 
             <div className="flex-1 overflow-y-auto">
               <div className="page-body" key={`${active.id}:${activeTab}`}>
+                {active.kind === 'dev' && devNotice && <div className="mac-card p-3 mb-4 text-[12px]" role="status" style={{ color: 'var(--text-muted)' }}>{devNotice}</div>}
                 {activeTab === 'posts' ? (
                   <PostsView
                     workspace={active}
                     posts={posts}
                     loading={loadingPosts}
                     error={postsError}
-                    onRefresh={() => fetchPosts(active.mdxPath, active.profile)}
+                    onRefresh={() => active.kind === 'dev' ? void refreshDev(active) : fetchPosts(active.mdxPath, active.profile)}
                     openNew={newPostOpen}
                     onNewOpened={onNewOpened}
                   />
@@ -274,7 +303,7 @@ export function WorkspacePage() {
                 ) : activeTab === 'images' ? (
                   <AssetGallery workspace={active} />
                 ) : (
-                  <WorkspaceSettingsTab workspace={active} />
+                  active.kind === 'dev' ? <DevSettings workspace={active} /> : <WorkspaceSettingsTab workspace={active} />
                 )}
               </div>
             </div>

@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import type { ImageOptimizeConfig, LocalStorageConfig, StorageConfig, StorageProvider, Workspace } from '../types';
 import { normalizeStorage } from '../types';
 import { useStore } from '../store';
-import { publicAssetDir } from '../../assets/imageUpload';
+import { publicAssetDir, s3Ready } from '../../assets/imageUpload';
+import { toast } from '../../../components/Toast';
 
 function Field({
   label,
@@ -29,20 +30,25 @@ function Field({
   );
 }
 
-export function StorageConfigTab({ workspace }: { workspace: Workspace }) {
+export function StorageConfigTab({ workspace, devOnly = false }: { workspace: Workspace; devOnly?: boolean }) {
   const { id: workspaceId, storage } = workspace;
   const { updateStorage } = useStore();
   const { t } = useTranslation();
-  const [cfg, setCfg] = useState<StorageConfig>(() => normalizeStorage(storage));
+  const [cfg, setCfg] = useState<StorageConfig>(() => {
+    const normalized = normalizeStorage(storage);
+    return devOnly ? { ...normalized, provider: 's3' } : normalized;
+  });
   const [secretDraft, setSecretDraft] = useState('');
   const [hasStoredSecret, setHasStoredSecret] = useState(Boolean(storage.s3.secretKey));
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setCfg(normalizeStorage(storage));
+    const normalized = normalizeStorage(storage);
+    setCfg(devOnly ? { ...normalized, provider: 's3' } : normalized);
     setSecretDraft('');
     setHasStoredSecret(Boolean(storage.s3.secretKey));
-  }, [storage]);
+  }, [storage, devOnly]);
 
   const setS3 = <K extends keyof StorageConfig['s3']>(key: K, val: StorageConfig['s3'][K]) =>
     setCfg(prev => ({ ...prev, s3: { ...prev.s3, [key]: val } }));
@@ -52,7 +58,7 @@ export function StorageConfigTab({ workspace }: { workspace: Workspace }) {
     setCfg(prev => ({ ...prev, optimize: { ...prev.optimize, [key]: val } }));
   const setProvider = (provider: StorageProvider) => setCfg(prev => ({ ...prev, provider }));
 
-  const isLocal = cfg.provider === 'local';
+  const isLocal = !devOnly && cfg.provider === 'local';
   const resolvedPublicDir = publicAssetDir({ rootPath: workspace.rootPath, storage: cfg });
   const status = isLocal
     ? cfg.local.mode === 'colocated'
@@ -61,22 +67,31 @@ export function StorageConfigTab({ workspace }: { workspace: Workspace }) {
     : cfg.s3.bucket
       ? `${cfg.s3.bucket}/${cfg.s3.keyPrefix || ''}`
       : t('storage.notConfigured');
-  const statusOk = isLocal ? cfg.local.mode === 'colocated' || Boolean(resolvedPublicDir) : Boolean(cfg.s3.bucket);
+  const statusOk = isLocal ? cfg.local.mode === 'colocated' || Boolean(resolvedPublicDir) : s3Ready(cfg.s3);
 
   const handleSave = async () => {
+    if (saving) return;
     const nextCfg: StorageConfig = {
       ...cfg,
+      provider: devOnly ? 's3' : cfg.provider,
       s3: {
         ...cfg.s3,
         secretKey: secretDraft.trim() ? secretDraft : cfg.s3.secretKey,
       },
     };
-    await updateStorage(workspaceId, nextCfg);
-    setCfg(nextCfg);
-    setSecretDraft('');
-    setHasStoredSecret(Boolean(nextCfg.s3.secretKey));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1600);
+    setSaving(true);
+    try {
+      await updateStorage(workspaceId, nextCfg);
+      setCfg(nextCfg);
+      setSecretDraft('');
+      setHasStoredSecret(Boolean(nextCfg.s3.secretKey));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1600);
+    } catch (error) {
+      toast.error(t('common.error'), String(error));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const inputCls = 'mac-input mac-input-mono w-full';
@@ -93,15 +108,15 @@ export function StorageConfigTab({ workspace }: { workspace: Workspace }) {
         <span className="text-[11px] mac-input-mono truncate" style={{ color: 'var(--text-faint)' }}>
           {status}
         </span>
-        <span
+        {!devOnly && <span
           className="text-[10px] mac-input-mono truncate"
           style={{ color: 'var(--text-faint)', marginInlineStart: 'auto', flexShrink: 0 }}
         >
           .mditoor.json
-        </span>
+        </span>}
       </div>
 
-      <div className="mac-segmented" role="radiogroup" aria-label={t('storage.provider')}>
+      {!devOnly && <div className="mac-segmented" role="radiogroup" aria-label={t('storage.provider')}>
         {(['local', 's3'] as const).map(p => (
           <button
             key={p}
@@ -114,7 +129,7 @@ export function StorageConfigTab({ workspace }: { workspace: Workspace }) {
             {t(`storage.providers.${p}`)}
           </button>
         ))}
-      </div>
+      </div>}
 
       {isLocal && (
         <div className="space-y-4">
@@ -290,7 +305,7 @@ export function StorageConfigTab({ workspace }: { workspace: Workspace }) {
       </div>
 
       <div className="flex items-center gap-3 pt-1">
-        <button onClick={handleSave} className="mac-btn mac-btn-primary">
+        <button onClick={() => void handleSave()} disabled={saving} className="mac-btn mac-btn-primary">
           {t('storage.save')}
         </button>
         {saved && (
