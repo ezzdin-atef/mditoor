@@ -584,7 +584,7 @@ td:first-child { font-weight: 600; }
 .dl-hero h1 { font-size: clamp(32px, 5vw, 48px); letter-spacing: -0.035em; line-height: 1.1; font-weight: 800; margin: 0 0 10px; }
 .dl-hero p { color: var(--text-muted); font-size: 16.5px; margin: 0 auto; max-width: 60ch; }
 
-.platforms { display: grid; grid-template-columns: 1.35fr 1fr 1fr; gap: 14px; padding-bottom: 32px; }
+.platforms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding-bottom: 32px; }
 .platform {
   display: flex; flex-direction: column; gap: 14px; padding: 22px;
   background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-xl); box-shadow: var(--shadow-sm);
