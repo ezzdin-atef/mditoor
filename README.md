@@ -13,6 +13,15 @@
 
 [Download](#installation) · [Features](#features) · [Getting started](#getting-started) · [Contributing](#contributing)
 
+<br />
+
+<a href="https://www.producthunt.com/products/mditoor?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-mditoor" target="_blank" rel="noopener noreferrer">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1287738&amp;theme=dark&amp;t=1792572925090" />
+    <img alt="Mditoor - Write and publish MDX blogs from one desktop app | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1287738&amp;theme=light&amp;t=1792572925090" />
+  </picture>
+</a>
+
 </div>
 
 ---

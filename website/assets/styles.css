@@ -262,6 +262,14 @@ kbd {
 .hero .lede { font-size: clamp(16px, 2vw, 18.5px); color: var(--text-muted); max-width: 60ch; margin: 0 auto 28px; text-wrap: pretty; }
 .cta-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 .hero-meta { margin-top: 18px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.ph-badge {
+  display: inline-block; margin-top: 28px; border-radius: 12px; line-height: 0;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.ph-badge img { display: block; width: 250px; height: 54px; max-width: 100%; }
+.ph-badge:hover { transform: translateY(-2px); box-shadow: 0 10px 24px -12px rgba(218, 85, 47, .45); }
+.ph-badge:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .ph-badge, .ph-badge:hover { transition: none; transform: none; } }
 
 /* ---------- App mock (window) ---------- */
 
