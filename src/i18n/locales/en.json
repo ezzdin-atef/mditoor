@@ -137,6 +137,42 @@
         "point3": "Publish or sync with one click",
         "footer": "Your API key is stored only on this computer."
       }
+    },
+    "flow": {
+      "duplicate": "This folder is already the workspace \"{{name}}\".",
+      "openExisting": "Open it",
+      "folderMissing": "Folder not found. Pick an existing project folder.",
+      "useSuggested": "Use",
+      "notesNew": "New folder: it will be created when you click Create.",
+      "notesEmpty": "Empty folder: ready for your first notes.",
+      "notesExisting_one": "Existing notes found: {{count}} note in {{folders}} folders. They will be kept as they are.",
+      "notesExisting_other": "Existing notes found: {{count}} notes in {{folders}} folders. They will be kept as they are.",
+      "startWith": "Start with",
+      "templates": {
+        "empty": {
+          "title": "Empty",
+          "hint": "A blank folder"
+        },
+        "study": {
+          "title": "Study",
+          "hint": "Inbox and a folder per course"
+        },
+        "journal": {
+          "title": "Journal",
+          "hint": "A note per day, by year"
+        },
+        "research": {
+          "title": "Research",
+          "hint": "Papers, ideas, reading list"
+        }
+      },
+      "alreadyRepo": "Already a Git repository",
+      "alreadyRepoHint": "Mditoor uses it as is. Commit and push from the Git tab.",
+      "remoteInvalid": "This doesn't look like a Git URL (https://… or git@…).",
+      "needKey": "Paste your DEV API key to connect.",
+      "needFolder": "Choose a folder to continue.",
+      "needContent": "Choose the folder that holds your posts.",
+      "needName": "Give the workspace a name."
     }
   },
   "posts": {

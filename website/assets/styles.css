@@ -502,6 +502,9 @@ section { scroll-margin-top: 76px; }
 .pillar-icon.coral { background: color-mix(in srgb, var(--accent-2) 14%, transparent); color: var(--accent-2); }
 .pillar-icon.amber { background: color-mix(in srgb, var(--accent-3) 16%, transparent); color: color-mix(in srgb, var(--accent-3) 80%, #000); }
 .pillar-icon.indigo { background: color-mix(in srgb, var(--indigo) 13%, transparent); color: var(--indigo); }
+.pillar-icon.purple { background: color-mix(in srgb, var(--purple) 13%, transparent); color: var(--purple); }
+/* "New" tag next to a pillar icon. */
+.pillar-new { margin: -4px 0 10px; }
 .pillar h3 { font-size: 24px; line-height: 1.2; letter-spacing: -0.02em; font-weight: 750; margin: 0 0 10px; }
 .pillar p { margin: 0 0 16px; color: var(--text-muted); }
 .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
@@ -528,6 +531,46 @@ section { scroll-margin-top: 76px; }
 .dest .mac-segmented { display: flex; }
 .dest .mac-segment { flex: 1; }
 .dest p { margin: 10px 0 0; font: 11.5px/1.5 var(--mono); color: var(--text-muted); overflow-wrap: anywhere; }
+
+/* Notes workspace demo: folder tree + notes in the open folder + git bar */
+.notes-demo {
+  display: grid; grid-template-columns: 160px minmax(0, 1fr);
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden;
+}
+.notes-tree { display: grid; gap: 2px; align-content: start; padding: 12px 8px; background: var(--surface); border-inline-end: 1px solid var(--border); }
+.notes-tree .label-caps { padding: 0 6px 6px; }
+.nt-item { display: flex; align-items: center; gap: 7px; height: 28px; padding: 0 8px; border-radius: var(--r-sm); font-size: 12.5px; color: var(--text-muted); }
+.nt-item svg { width: 14px; height: 14px; flex: none; }
+.nt-item.nt-sub { padding-inline-start: 22px; }
+.nt-item.selected { background: var(--accent-faint); color: var(--accent); font-weight: 600; }
+.nt-icon { font-size: 13px; line-height: 1; }
+.nt-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-count { font-size: 11px; color: var(--text-faint); }
+.nt-item.selected .nt-count { color: inherit; }
+.notes-main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-content: start; padding: 14px; min-width: 0; }
+.notes-crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: 12px; color: var(--text-muted); }
+.notes-crumbs i { font-style: normal; color: var(--text-faint); }
+.notes-crumbs b { color: var(--text); font-weight: 650; }
+.notes-list { border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+.note-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+.note-row:last-child { border-bottom: 0; }
+.note-icon { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: var(--r-sm); background: var(--surface-2); color: var(--text-muted); }
+.note-icon svg { width: 15px; height: 15px; }
+.note-meta { flex: 1; min-width: 0; }
+.note-meta b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; unicode-bidi: plaintext; text-align: start; }
+.note-meta b[dir="rtl"] { font-family: var(--font-ar); }
+.note-meta small { display: block; font: 11px/1.4 var(--mono); color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notes-git { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--r); background: var(--surface); font-size: 12px; color: var(--text-muted); }
+.notes-git svg { width: 15px; height: 15px; flex: none; color: var(--accent); }
+.notes-git b { color: var(--text); }
+.notes-git span:not(.mac-btn) { flex: 1; min-width: 0; font-family: var(--mono); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notes-git .mac-btn { height: 28px; padding: 0 10px; font-size: 12px; }
+@media (max-width: 560px) {
+  /* minmax(0, …) lets the column shrink below its content so long paths truncate instead of clipping. */
+  .notes-demo { grid-template-columns: minmax(0, 1fr); }
+  .notes-tree { display: none; }
+  .notes-main { padding: 12px; }
+}
 
 /* Editor demo */
 .editor-demo { display: grid; grid-template-columns: minmax(0, 1fr) 190px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }

@@ -137,6 +137,42 @@
         "point3": "Publiez ou synchronisez en un clic",
         "footer": "Votre clé API reste uniquement sur cet ordinateur."
       }
+    },
+    "flow": {
+      "duplicate": "Ce dossier est déjà l’espace « {{name}} ».",
+      "openExisting": "L’ouvrir",
+      "folderMissing": "Dossier introuvable. Choisissez un dossier de projet existant.",
+      "useSuggested": "Utiliser",
+      "notesNew": "Nouveau dossier : il sera créé quand vous cliquerez sur Créer.",
+      "notesEmpty": "Dossier vide : prêt pour vos premières notes.",
+      "notesExisting_one": "Notes existantes : {{count}} note dans {{folders}} dossiers. Elles restent telles quelles.",
+      "notesExisting_other": "Notes existantes : {{count}} notes dans {{folders}} dossiers. Elles restent telles quelles.",
+      "startWith": "Commencer avec",
+      "templates": {
+        "empty": {
+          "title": "Vide",
+          "hint": "Un dossier vierge"
+        },
+        "study": {
+          "title": "Études",
+          "hint": "Boîte de réception et un dossier par cours"
+        },
+        "journal": {
+          "title": "Journal",
+          "hint": "Une note par jour, par année"
+        },
+        "research": {
+          "title": "Recherche",
+          "hint": "Articles, idées, lectures"
+        }
+      },
+      "alreadyRepo": "Déjà un dépôt Git",
+      "alreadyRepoHint": "Mditoor l’utilise tel quel. Validez et poussez depuis l’onglet Git.",
+      "remoteInvalid": "Ceci ne ressemble pas à une URL Git (https://… ou git@…).",
+      "needKey": "Collez votre clé API DEV pour vous connecter.",
+      "needFolder": "Choisissez un dossier pour continuer.",
+      "needContent": "Choisissez le dossier qui contient vos articles.",
+      "needName": "Donnez un nom à l’espace."
     }
   },
   "posts": {

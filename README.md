@@ -26,7 +26,7 @@
 
 ---
 
-Mditoor is a desktop app (Tauri + React + Rust) for writing in a static site's repository or directly on DEV.to. Local project workspaces edit plain `.md` / `.mdx` files in place, manage images, and handle git. DEV workspaces keep local Markdown drafts and sync articles to your DEV account.
+Mditoor is a desktop app (Tauri + React + Rust) for writing in a static site's repository, keeping personal or study notes, or publishing directly on DEV.to. Local project workspaces edit plain `.md` / `.mdx` files in place, manage images, and handle git. Notes workspaces organize Markdown notes in nested folders with optional Git sync. DEV workspaces keep local Markdown drafts and sync articles to your DEV account.
 
 It is designed for people who write in **both Arabic and English**: text direction is detected per block, and the UI itself is available in English, Arabic, and French.
 
@@ -35,7 +35,9 @@ It is designed for people who write in **both Arabic and English**: text directi
 ## Features
 
 - **Editor** — block-based editor and raw Markdown mode, with formatting toolbar and keyboard shortcuts
-- **RTL / LTR** — automatic text direction per block, so mixed Arabic/English posts just work
+- **Block menus** — type `/` and filter (`/im` → Image, `/h2` → Heading 2), or right-click / use the `⋯` button on any block to turn it into a heading, list, quote, callout or code; drag the handle to reorder
+- **Notes workspaces** — personal or study notes in nested folders, with starter templates, frontmatter, no SEO, and optional Git sync ([details](#notes-workspaces))
+- **RTL / LTR** — automatic text direction per block, so mixed Arabic/English posts just work, in the editor and in the preview
 - **Frontmatter forms** — define metadata fields per workspace (`text`, `number`, `boolean`, `date`, `select`, `tags`, `image`) and edit them as a form instead of raw YAML/TOML
 - **Framework presets** — post layout, file extension, frontmatter format and image location for common static-site generators
 - **Git** — status, diff view, stage, commit, pull, and push from inside the app
@@ -47,6 +49,46 @@ It is designed for people who write in **both Arabic and English**: text directi
 - **Cross-posting** — send a local project post to a connected DEV account with an optional canonical URL
 - **Command palette** — `Ctrl/Cmd + K` to jump anywhere
 - **Local-first** — local drafts remain available offline; posts go to DEV only when you choose to sync or publish
+
+### Notes workspaces
+
+For writing that isn't a blog post: lecture notes, research, a journal, a personal wiki. Create a workspace and choose **Notes**, pick a folder (or use the suggested `Documents/Mditoor Notes`; it is created if it doesn't exist), and optionally start from a template.
+
+| Template | Creates                                          | First note                     |
+| -------- | ------------------------------------------------ | ------------------------------ |
+| Empty    | nothing, just the folder                         | none                           |
+| Study    | `inbox/`, `courses/example-course/`              | `inbox/welcome.md`             |
+| Journal  | `journal/<year>/`                                | `journal/<year>/<today>.md`    |
+| Research | `papers/`, `ideas/`, `reading-list/`             | `ideas/welcome.md`             |
+
+Notes are plain files at any depth, so the folder works with any other Markdown tool too:
+
+```text
+~/Documents/Mditoor Notes/      <- workspace path
+├── .mditoor.json               <- fields and settings
+├── inbox/
+│   └── welcome.md
+└── courses/
+    └── calculus/
+        ├── limits.md
+        └── images/             <- images added to notes in this folder
+            └── graph.png
+```
+
+Each note gets a small frontmatter form instead of the SEO panel. The default fields are below, and you can change them in the **Metadata** tab:
+
+```yaml
+---
+title: Limits and continuity
+tags: [calculus, exam]
+created: 2026-10-21
+status: learning   # todo | learning | done
+---
+```
+
+The **Notes** tab shows a folder tree with breadcrumbs. You can create nested folders (`math/calculus`), rename or move a note by editing its path, and search across every folder. A folder can only be deleted once it is empty, so notes are never removed by accident.
+
+To back up or sync notes, leave **Track with Git** on when creating the workspace (Mditoor runs `git init`, or uses the repository that is already there) and paste a remote such as `https://github.com/you/notes.git`. Then commit and push from the **Git** tab.
 
 ### DEV.to workspaces
 
@@ -103,7 +145,7 @@ Download from the [Releases page](https://github.com/ezzdin-atef/mditoor/release
 
 ## Getting started
 
-1. **Create a workspace.** Pick your project root (Mditoor detects the framework and suggests the posts folder) or pick the posts folder directly.
+1. **Create a workspace.** Choose its type: **Site project** (pick your project root, and Mditoor detects the framework and suggests the posts folder, or pick the posts folder directly), **[Notes](#notes-workspaces)** for personal or study notes, or **[DEV.to](#devto-workspaces)**.
 2. **Define your metadata fields** in the workspace settings, e.g. `title`, `date`, `status`, `tags`.
 3. **Write.** Create a post, fill the frontmatter form, and add images.
 4. **Commit and push** from the Git panel.
@@ -188,7 +230,7 @@ pnpm tauri icon src-tauri/icons/icon-source.svg
 
 ```text
 src/                    React frontend
-├── features/           feature modules (editor, posts, git, assets, workspace, settings, ideas)
+├── features/           feature modules (editor, posts, notes, git, assets, workspace, settings, ideas, dev)
 ├── components/         shared UI components
 ├── i18n/locales/       translations (en, ar, fr)
 ├── store/              global Zustand stores

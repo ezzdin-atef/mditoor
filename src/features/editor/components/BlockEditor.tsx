@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import hljs from 'highlight.js/lib/core';
 import { CustomSelect } from '../../../components/CustomSelect';
@@ -1197,14 +1197,7 @@ export function BlockEditor({ value, onChange, editorStyle, onInsertImage }: Pro
   };
 
   // Nearest gap to the pointer: before the first row whose middle is below it, else after the last.
-  // The drop preview sits in the flow and pushes rows down, so hovering it keeps the current slot;
-  // without that, the preview moving would move the rows and flip the slot back and forth.
   const dropSlotAt = (clientY: number): number => {
-    const preview = rootRef.current?.querySelector<HTMLElement>('[data-drop-preview]');
-    if (preview && dropSlot !== null) {
-      const p = preview.getBoundingClientRect();
-      if (clientY >= p.top && clientY <= p.bottom) return dropSlot;
-    }
     const rows = rootRef.current?.querySelectorAll<HTMLElement>('[data-block-row]') ?? [];
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i].getBoundingClientRect();
@@ -1260,12 +1253,8 @@ export function BlockEditor({ value, onChange, editorStyle, onInsertImage }: Pro
   };
 
   const dragFrom = draggingId ? blocks.findIndex(b => b.id === draggingId) : -1;
-  // Dropping right next to itself changes nothing, so no preview there.
+  // Dropping right next to itself changes nothing, so no indicator there.
   const activeSlot = dropSlot !== null && dropSlot !== dragFrom && dropSlot !== dragFrom + 1 ? dropSlot : null;
-  const dragged = dragFrom >= 0 ? blocks[dragFrom] : null;
-  const dropPreview = dragged && activeSlot !== null
-    ? <DropPreview key={`drop-${activeSlot}`} block={dragged} editorStyle={editorStyle} />
-    : null;
 
   return (
     <div
@@ -1286,8 +1275,7 @@ export function BlockEditor({ value, onChange, editorStyle, onInsertImage }: Pro
       onDrop={e => {
         if (!draggingId || !e.dataTransfer.types.includes(BLOCK_MIME)) return;
         e.preventDefault();
-        // Drop where the preview shows, even if the pointer is over the preview itself.
-        moveBlock(draggingId, dropSlot ?? dropSlotAt(e.clientY));
+        moveBlock(draggingId, dropSlotAt(e.clientY));
         endDrag();
       }}
     >
@@ -1314,9 +1302,8 @@ export function BlockEditor({ value, onChange, editorStyle, onInsertImage }: Pro
         };
         const line = firstLine(b.type, textStyle);
         return (
-          <Fragment key={b.id}>
-          {activeSlot === index && dropPreview}
           <div
+            key={b.id}
             data-block-row={b.id}
             className={`block-editor-row${draggingId === b.id ? ' dragging' : ''}${justDropped === b.id ? ' just-dropped' : ''}${menu?.blockId === b.id ? ' menu-open' : ''}`}
             // Side buttons and list markers centre on the first line (see firstLine).
@@ -1329,6 +1316,8 @@ export function BlockEditor({ value, onChange, editorStyle, onInsertImage }: Pro
               setMenu({ blockId: b.id, x: e.clientX, y: e.clientY });
             }}
           >
+            {activeSlot === index && <div className="block-drop-indicator before" aria-hidden="true" />}
+            {activeSlot === blocks.length && index === blocks.length - 1 && <div className="block-drop-indicator after" aria-hidden="true" />}
             <div className="block-editor-controls">
               <button
                 type="button"
@@ -1535,8 +1524,6 @@ export function BlockEditor({ value, onChange, editorStyle, onInsertImage }: Pro
               </button>
             </div>
           </div>
-          {index === blocks.length - 1 && activeSlot === blocks.length && dropPreview}
-          </Fragment>
         );
       })}
       {menu && (() => {
@@ -1555,65 +1542,6 @@ export function BlockEditor({ value, onChange, editorStyle, onInsertImage }: Pro
           />
         );
       })()}
-    </div>
-  );
-}
-
-/* ─── Drop preview: the dragged block, shown where it will land ──────── */
-
-/**
- * A read-only copy of the dragged block in the gap it would drop into. It uses the row
- * layout (side columns + content) so it lines up exactly with the real block.
- */
-function DropPreview({ block: b, editorStyle }: { block: Block; editorStyle: React.CSSProperties }) {
-  const textStyle = blockTextStyle(b.type, editorStyle);
-  const line = firstLine(b.type, textStyle);
-  const img = b.type === 'paragraph' ? /^!\[([^\]]*)\]\(([^)]+)\)\s*$/.exec(b.text.trim()) : null;
-
-  let content: React.ReactNode;
-  if (img) {
-    content = <ResolvedImg src={img[2]} alt={img[1]} className="image-block-img drop-preview-img" />;
-  } else if (b.type === 'divider') {
-    content = <div className="divider-block"><hr className="divider-line" /></div>;
-  } else if (b.type === 'code') {
-    content = <pre className="drop-preview-code">{b.text.split('\n').slice(0, 8).join('\n') || ' '}</pre>;
-  } else if (b.type === 'table') {
-    const { headers, rows } = parseTableText(b.text);
-    content = (
-      <div className="drop-preview-table">
-        {headers.map((h, i) => <span key={i}>{h || ' '}</span>)}
-        <small>{rows.length} {rows.length === 1 ? 'row' : 'rows'}</small>
-      </div>
-    );
-  } else if (b.type === 'callout') {
-    const { emoji, content: text } = calloutParts(b.text);
-    content = (
-      <div className="callout-block">
-        <span className="callout-emoji-btn">{emoji}</span>
-        <InlineView text={text} fallback="&nbsp;" className="callout-text block-view" style={{ ...editorStyle, lineHeight: 1.6 }} />
-      </div>
-    );
-  } else {
-    content = (
-      <InlineView
-        text={b.text}
-        fallback="&nbsp;"
-        className={`block-editor-input block-${b.type} block-view`}
-        style={textStyle}
-      />
-    );
-  }
-
-  return (
-    <div
-      className="block-drop-preview"
-      data-drop-preview
-      aria-hidden="true"
-      style={{ '--line-top': `${line.top}px`, '--line-h': `${line.height}px` } as React.CSSProperties}
-    >
-      <div className="block-editor-controls" />
-      <div className="block-editor-content">{content}</div>
-      <div className="block-editor-end" />
     </div>
   );
 }

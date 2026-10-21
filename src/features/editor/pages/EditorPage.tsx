@@ -275,6 +275,13 @@ function EditorScreen({ route }: { route: EditorRoute }) {
     navigate({ page: 'workspace' });
   }, [dirty, navigate, save]);
 
+  // Same for mouse Back / Forward and Alt+arrows: the router asks before leaving.
+  // save() is a no-op when nothing changed, and returns false (staying here) if writing fails.
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  const setLeaveGuard = useRouter(s => s.setLeaveGuard);
+  useEffect(() => setLeaveGuard(() => saveRef.current()), [setLeaveGuard]);
+
   const removePost = useCallback(async () => {
     if (!workspace) return;
     if (!onDisk) {

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
-import { useRouter } from './router';
+import { installHistoryInput, useRouter } from './router';
 import { applyTheme, ARABIC_FONT_FAMILY, useSettings, type Settings } from './features/settings/store';
 import { useStore, type StoredWorkspace } from './features/workspace/store';
 import { WorkspacePage } from './features/workspace/pages/WorkspacePage';
@@ -72,6 +72,9 @@ function useGlobalShortcuts() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [navigate]);
+
+  // Mouse back / forward buttons and Alt+Left / Alt+Right.
+  useEffect(() => installHistoryInput(), []);
 }
 
 function useWindowTitle(): string {

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Mditoor &ndash; Free Markdown &amp; MDX Editor for Developer Blogs</title>
   <meta name="description" content="Mditoor is a free, open-source desktop Markdown and MDX editor for developer blogs. Write .md/.mdx posts, edit frontmatter, compress images, publish with git." />
-  <meta name="keywords" content="markdown editor, mdx editor, md editor, blog markdown editor, markdown blog editor, desktop markdown editor, offline markdown editor, open source markdown editor, markdown editor for windows, frontmatter editor, git-based cms, static site cms, headless cms alternative, next.js blog editor, astro blog editor, hugo editor, jekyll editor, docusaurus blog, image compression for blogs, rtl markdown editor, arabic markdown editor" />
+  <meta name="keywords" content="markdown editor, mdx editor, md editor, blog markdown editor, markdown blog editor, desktop markdown editor, offline markdown editor, open source markdown editor, markdown editor for windows, frontmatter editor, git-based cms, static site cms, headless cms alternative, next.js blog editor, astro blog editor, hugo editor, jekyll editor, docusaurus blog, image compression for blogs, rtl markdown editor, arabic markdown editor, markdown notes app, study notes app, markdown notes with git" />
   <meta name="author" content="Ezzdin Atef" />
   <meta name="robots" content="index, follow, max-image-preview:large" />
   <link rel="canonical" href="https://mditoor.com/" />
@@ -63,6 +63,7 @@
           "Ideas board for planning blog posts",
           "Image compression and resizing on import",
           "Multiple workspaces for multiple blogs and repos",
+          "Notes workspaces for personal and study notes in nested folders, with Git sync",
           "Image storage next to posts, in public/, or on S3-compatible buckets",
           "Built-in git: diff, commit, pull and push",
           "Right-to-left (RTL) and left-to-right text per block",
@@ -84,6 +85,7 @@
           { "@type": "Question", "name": "Is Mditoor a CMS?", "acceptedAnswer": { "@type": "Answer", "text": "Mditoor works like a local, git-based CMS for static sites. Your posts stay as plain Markdown files in your repository and you publish by committing and pushing from the app." } },
           { "@type": "Question", "name": "Does Mditoor compress images?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Images are resized, compressed and optionally sharpened when you add them, and the asset gallery shows unused images so you can clean them up." } },
           { "@type": "Question", "name": "Does Mditoor work offline?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Mditoor is a local-first desktop app. It only uses the network for git operations and image uploads that you trigger." } },
+          { "@type": "Question", "name": "Can I use Mditoor for personal or study notes?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Create a Notes workspace and Mditoor keeps your notes as plain Markdown or MDX files in nested folders, with frontmatter for title, tags and status. There is no SEO panel and no site needed, and you can turn on Git to push your notes to GitHub." } },
           { "@type": "Question", "name": "Is Mditoor available for Mac and Linux?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Alongside the Windows installer there are alpha builds for macOS (a universal .dmg for Intel and Apple Silicon) and Linux (AppImage and .deb). They work but are not regularly tested yet." } }
         ]
       }
@@ -106,6 +108,7 @@
       </a>
       <nav class="nav" aria-label="Main">
         <a class="mac-btn mac-btn-ghost nav-hide" href="#features">Features</a>
+        <a class="mac-btn mac-btn-ghost nav-hide" href="#notes">Notes</a>
         <a class="mac-btn mac-btn-ghost nav-hide" href="#frameworks">Frameworks</a>
         <a class="mac-btn mac-btn-ghost nav-hide" href="https://github.com/ezzdin-atef/mditoor">GitHub</a>
         <a class="mac-btn mac-btn-primary" href="/download">Download</a>
@@ -336,6 +339,7 @@
               <p>Browse every blog post as a gallery or list, see drafts at a glance, and write in a block editor or raw Markdown. Frontmatter becomes a real form with dates, selects, tags and image pickers &mdash; no hand-editing YAML.</p>
               <ul class="checks">
                 <li>Block editor with slash menu, code blocks, tables and callouts</li>
+                <li>Right-click or the <kbd>⋯</kbd> button to turn any block into a heading, list or quote; drag to reorder</li>
                 <li>Custom frontmatter fields per workspace, YAML or TOML</li>
                 <li>SEO checks before you publish</li>
               </ul>
@@ -433,6 +437,47 @@
               </div>
             </div>
           </article>
+
+          <article class="pillar" id="notes">
+            <div class="pillar-copy">
+              <div class="pillar-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v16H6.5A1.5 1.5 0 0 0 5 20.5z"/><path d="M5 20.5A1.5 1.5 0 0 0 6.5 22H19v-3M9 7.5h6M9 11h4"/></svg></div>
+              <span class="badge badge-purple pillar-new">New</span>
+              <h3>Notes workspaces for study, research and journals</h3>
+              <p>Not every Markdown file is a blog post. A Notes workspace keeps personal or study notes in nested folders &mdash; plain <code>.md</code> or <code>.mdx</code> files with frontmatter, no SEO panel, no site needed. Turn on Git and push to GitHub to back up and sync your notes.</p>
+              <ul class="checks">
+                <li>Folders and subfolders at any depth, with a tree and breadcrumbs</li>
+                <li>Start empty or from a Study, Journal or Research template</li>
+                <li>Title, tags, created date and status as a frontmatter form</li>
+                <li>One click to set up Git and connect a remote to push to</li>
+              </ul>
+            </div>
+            <div class="pillar-demo">
+              <div class="notes-demo" aria-label="Notes workspace preview">
+                <div class="notes-tree" aria-hidden="true">
+                  <span class="label-caps">Folders</span>
+                  <div class="nt-item"><span class="nt-icon">📚</span><span class="nt-name">All notes</span><span class="nt-count">14</span></div>
+                  <div class="nt-item"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3H6l1.5 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/></svg><span class="nt-name">inbox</span><span class="nt-count">3</span></div>
+                  <div class="nt-item"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3H6l1.5 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/></svg><span class="nt-name">courses</span><span class="nt-count">9</span></div>
+                  <div class="nt-item nt-sub selected"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3H6l1.5 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/></svg><span class="nt-name">calculus</span><span class="nt-count">5</span></div>
+                  <div class="nt-item nt-sub"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3H6l1.5 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/></svg><span class="nt-name">algorithms</span><span class="nt-count">4</span></div>
+                  <div class="nt-item"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3H6l1.5 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/></svg><span class="nt-name">reading</span><span class="nt-count">2</span></div>
+                </div>
+                <div class="notes-main">
+                  <div class="notes-crumbs" aria-hidden="true"><span>Study notes</span><i>›</i><span>courses</span><i>›</i><b>calculus</b></div>
+                  <div class="notes-list">
+                    <div class="note-row"><span class="note-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 2h5.5L12 4.5V14H4zM6 7.5h4M6 10h4"/></svg></span><div class="note-meta"><b>Limits and continuity</b><small>courses/calculus/limits.md</small></div><span class="badge badge-green">done</span></div>
+                    <div class="note-row"><span class="note-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 2h5.5L12 4.5V14H4zM6 7.5h4M6 10h4"/></svg></span><div class="note-meta"><b>Derivatives cheat sheet</b><small>courses/calculus/derivatives.md</small></div><span class="badge badge-accent">learning</span></div>
+                    <div class="note-row"><span class="note-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 2h5.5L12 4.5V14H4zM6 7.5h4M6 10h4"/></svg></span><div class="note-meta"><b dir="rtl">ملخص التكامل بالأجزاء</b><small>courses/calculus/integration.md</small></div><span class="badge">todo</span></div>
+                  </div>
+                  <div class="notes-git" aria-hidden="true">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="4.5" cy="3.5" r="1.5"/><circle cx="4.5" cy="12.5" r="1.5"/><circle cx="11.5" cy="5.5" r="1.5"/><path d="M4.5 5v6M11.5 7c0 2.5-3 3-7 4"/></svg>
+                    <b>main</b><span>github.com/you/notes</span>
+                    <span class="mac-btn mac-btn-primary">Commit &amp; push</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
         </div>
       </div>
     </section>
@@ -512,6 +557,10 @@
           <details>
             <summary>Does Mditoor work offline?</summary>
             <p>Yes. Mditoor is a local-first desktop app. It only uses the network for git operations and image uploads that you trigger.</p>
+          </details>
+          <details>
+            <summary>Can I use Mditoor for personal or study notes?</summary>
+            <p>Yes. Create a <a class="link" href="#notes">Notes workspace</a> and Mditoor keeps your notes as plain Markdown or MDX files in nested folders, with frontmatter for title, tags and status. There is no SEO panel and no site needed, and you can turn on Git to push your notes to GitHub.</p>
           </details>
           <details>
             <summary>Is Mditoor available for Mac and Linux?</summary>

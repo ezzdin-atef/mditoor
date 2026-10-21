@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import { DEFAULT_PROFILE, DEFAULT_STORAGE, FRAMEWORK_PRESETS, NOTE_FIELDS, NOTES_PROFILE, normalizeProfile, normalizeStorage } from './types';
 import type { FieldType, Framework, MetadataField, ProjectInfo, SiteProfile, StorageConfig, Workspace } from './types';
+import { applyNotesTemplate, type NotesTemplate } from '../notes/templates';
 
 const LS_KEY = 'mditoor:workspaces';
 const FILE   = 'workspaces.json';
@@ -102,6 +103,8 @@ export interface NewNotesWorkspace {
   /** Run `git init` (and set `origin` when `remote` is given). */
   git?: boolean;
   remote?: string;
+  /** Starter folders and first note; only pass it for a new or empty folder. */
+  template?: NotesTemplate;
 }
 
 interface Store {
@@ -110,7 +113,8 @@ interface Store {
   hydrateWorkspaces: (stored: StoredWorkspace[]) => void;
   addWorkspace: (input: NewWorkspace) => Promise<void>;
   addDevWorkspace: (id: string, username: string) => Promise<void>;
-  addNotesWorkspace: (input: NewNotesWorkspace) => Promise<void>;
+  /** Resolves with the starter note's path when a template created one. */
+  addNotesWorkspace: (input: NewNotesWorkspace) => Promise<string | null>;
   updateWorkspace: (id: string, updates: Partial<Pick<Workspace, 'name' | 'mdxPath' | 'rootPath' | 'icon'>>) => Promise<void>;
   deleteWorkspace: (id: string) => Promise<void>;
   setActive: (id: string | null) => Promise<void>;
@@ -185,7 +189,7 @@ export const useStore = create<Store>((set, get) => ({
     set({ workspaces, activeId: id });
   },
 
-  addNotesWorkspace: async ({ name, mdxPath, icon, git, remote }) => {
+  addNotesWorkspace: async ({ name, mdxPath, icon, git, remote, template }) => {
     // Re-opening an existing notes folder keeps its schema and storage.
     const existing = await readConfig(mdxPath);
     const w: Workspace = {
@@ -202,6 +206,7 @@ export const useStore = create<Store>((set, get) => ({
     };
     // Writing the config creates the folder.
     await writeConfig(w);
+    const firstNote = template && template !== 'empty' ? await applyNotesTemplate(mdxPath, w.profile, template) : null;
     if (git) {
       const status = await invoke<{ is_repo: boolean }>('git_status', { mdxPath });
       if (!status.is_repo) await invoke('git_init', { mdxPath });
@@ -210,6 +215,7 @@ export const useStore = create<Store>((set, get) => ({
     const workspaces = [...get().workspaces, w];
     save(workspaces);
     set({ workspaces, activeId: w.id });
+    return firstNote;
   },
 
   updateWorkspace: async (id, updates) => {
