@@ -8,11 +8,14 @@ import { newPostSlug, postFileName, slugify } from './postMeta';
  * Asks for the post title and derives the slug from it. The slug stays in sync
  * with the title until the user edits it by hand.
  */
-export function NewPostModal({ profile, existing, onCreate, onClose }: {
+export function NewPostModal({ profile, existing, onCreate, onClose, folder = '', heading }: {
   profile: Pick<SiteProfile, 'layout' | 'extension'>;
   existing: Set<string>;
   onCreate: (slug: string, title: string) => void;
   onClose: () => void;
+  /** Notes: folder the new note goes in; the slug passed to `onCreate` includes it. */
+  folder?: string;
+  heading?: string;
 }) {
   const { t } = useTranslation();
   const [title, setTitle] = useState('');
@@ -28,7 +31,8 @@ export function NewPostModal({ profile, existing, onCreate, onClose }: {
   }, [onClose]);
 
   const base = slugify(slugEdited ? slugDraft : title);
-  const slug = newPostSlug(profile, base);
+  const name = newPostSlug(profile, base);
+  const slug = name && folder ? `${folder}/${name}` : name;
   const taken = slug !== '' && existing.has(slug);
   const canCreate = Boolean(title.trim() && slug && !taken);
 
@@ -43,7 +47,7 @@ export function NewPostModal({ profile, existing, onCreate, onClose }: {
         <div className="px-6 pt-6 pb-4 flex items-start gap-4" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex-1 min-w-0">
             <h2 id="new-post-title" className="text-[18px] font-bold" style={{ color: 'var(--text)', letterSpacing: '-0.01em' }}>
-              {t('posts.new')}
+              {heading ?? t('posts.new')}
             </h2>
           </div>
           <button type="button" onClick={onClose} className="icon-btn" aria-label={t('common.close')}>

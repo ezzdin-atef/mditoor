@@ -5,7 +5,7 @@ import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { IconAlert, IconCopy, IconFolder, IconImage, IconLink, IconMinus, IconPen, IconPlus, IconSparkles, IconX } from '../../../components/Icons';
 import { toast } from '../../../components/Toast';
 import { formatBytes } from '../../../lib/ui';
-import { invalidateImages, resolveImage, type ResolvedImage } from '../../assets/imageResolve';
+import { invalidateImages, peekResolvedImage, resolveImage, type ResolvedImage } from '../../assets/imageResolve';
 import { optimizeImage, pickImageFile, s3Ready, uploadImage } from '../../assets/imageUpload';
 import type { Workspace } from '../../workspace/types';
 
@@ -115,6 +115,7 @@ export function ResolvedImg({ src, alt, className, onOpen }: {
  */
 export function useInlineImages(ref: RefObject<HTMLElement | null>, html: string) {
   const ctx = useContext(Ctx);
+  const { t } = useTranslation();
   useEffect(() => {
     const root = ref.current;
     if (!root) return;
@@ -126,8 +127,15 @@ export function useInlineImages(ref: RefObject<HTMLElement | null>, html: string
       if (!ctx) { img.src = src; continue; }
       resolveImage(ctx.workspace, ctx.slug, src).then(r => {
         if (!alive) return;
-        if (r.url) img.src = r.url;
-        else img.classList.add('inline-img-missing');
+        img.classList.remove('img-loading');
+        // Already set from the cache when the HTML was built; re-assigning would reload it.
+        if (r.url) { if (img.getAttribute('src') !== r.url) img.src = r.url; }
+        else {
+          img.classList.add('inline-img-missing');
+          img.title = `${t('viewer.notFound')}: ${src}`;
+          // The alt text is what shows in the placeholder; fall back to the file name.
+          if (!img.alt) img.alt = src.split('/').pop() ?? src;
+        }
       });
       const open = (e: MouseEvent) => {
         e.stopPropagation();
@@ -137,14 +145,43 @@ export function useInlineImages(ref: RefObject<HTMLElement | null>, html: string
       cleanups.push(() => img.removeEventListener('click', open));
     }
     return () => { alive = false; cleanups.forEach(c => c()); };
-  }, [ref, html, ctx]);
+  }, [ref, html, ctx, t]);
+}
+
+/**
+ * Moves each image's `src` to `data-src` so the webview never requests the unresolved
+ * path. Images found before get their real URL right away, so re-rendering the preview
+ * (every keystroke in split view) doesn't make them blink out and back.
+ */
+function prepareImages(html: string, ctx: EditorImages | null): string {
+  if (!/<img\b/i.test(html)) return html;
+  // A <template> parses without loading anything.
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  tpl.content.querySelectorAll('img').forEach(img => {
+    // Markdown output carries `src`; the block editor's inline view already uses `data-src`.
+    const src = img.getAttribute('data-src') ?? img.getAttribute('src') ?? '';
+    if (!src) return;
+    img.setAttribute('data-src', src);
+    const known = ctx ? peekResolvedImage(ctx.workspace, ctx.slug, src) : src;
+    if (known) img.setAttribute('src', known);
+    else { img.removeAttribute('src'); img.classList.add('img-loading'); }
+  });
+  return tpl.innerHTML;
+}
+
+/** `html` with image URLs filled in from earlier lookups; re-computed when files change. */
+export function usePreparedImages(html: string): string {
+  const ctx = useContext(Ctx);
+  const version = ctx?.version ?? 0;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => prepareImages(html, ctx), [html, ctx?.workspace, ctx?.slug, version]);
 }
 
 /** Rendered HTML (e.g. the markdown preview) whose images are resolved like the editor's. */
 export function ResolvedHtml({ html, ...props }: { html: string } & React.HTMLAttributes<HTMLDivElement>) {
   const ref = useRef<HTMLDivElement>(null);
-  // Swap src for data-src so the webview never requests the unresolved path.
-  const prepared = useMemo(() => html.replace(/<img\b([^>]*?)\ssrc=/gi, '<img$1 data-src='), [html]);
+  const prepared = usePreparedImages(html);
   useInlineImages(ref, prepared);
   return <div ref={ref} {...props} dangerouslySetInnerHTML={{ __html: prepared }} />;
 }

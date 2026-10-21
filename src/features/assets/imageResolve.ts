@@ -43,6 +43,18 @@ export function imageHints(workspace: Pick<Workspace, 'rootPath' | 'storage'>) {
 }
 
 const cache = new Map<string, Promise<ResolvedImage>>();
+// URLs of images already found, readable synchronously so re-rendered HTML can carry
+// its `src` straight away instead of blinking while the async lookup runs again.
+const found = new Map<string, string>();
+
+const cacheKey = (workspace: ResolveWorkspace, slug: string, src: string) => `${workspace.mdxPath}|${slug}|${src}`;
+
+/** The loadable URL of an image resolved earlier, or null when it hasn't been (or wasn't found). */
+export function peekResolvedImage(workspace: ResolveWorkspace, slug: string, rawSrc: string): string | null {
+  const src = normalizeImageSrc(rawSrc);
+  if (REMOTE.test(src)) return src;
+  return found.get(cacheKey(workspace, slug, src)) ?? null;
+}
 
 /**
  * Resolves an image reference from a post the way the site would serve it, to a URL the
@@ -54,7 +66,7 @@ export function resolveImage(workspace: ResolveWorkspace, slug: string, rawSrc: 
   if (!src) return Promise.resolve({ src, url: null, path: null, remote: false, size: 0, tried: [] });
   if (REMOTE.test(src)) return Promise.resolve({ src, url: src, path: null, remote: true, size: 0, tried: [] });
 
-  const key = `${workspace.mdxPath}|${slug}|${src}`;
+  const key = cacheKey(workspace, slug, src);
   let p = cache.get(key);
   if (!p) {
     p = invoke<ImageLookup>('resolve_post_image', { mdxPath: workspace.mdxPath, slug, src, hints: imageHints(workspace) })
@@ -67,7 +79,10 @@ export function resolveImage(workspace: ResolveWorkspace, slug: string, rawSrc: 
         tried,
       }));
     cache.set(key, p);
-    p.then(r => { if (!r.path) cache.delete(key); }, () => cache.delete(key));
+    p.then(
+      r => { if (r.url) found.set(key, r.url); else cache.delete(key); },
+      () => cache.delete(key),
+    );
   }
   return p;
 }
@@ -75,4 +90,5 @@ export function resolveImage(workspace: ResolveWorkspace, slug: string, rawSrc: 
 /** Forget cached lookups, e.g. after a file was optimized or replaced on disk. */
 export function invalidateImages() {
   cache.clear();
+  found.clear();
 }

@@ -84,8 +84,11 @@ export function normalizeStorage(raw?: Partial<StorageConfig> | null): StorageCo
 
 export type Framework = 'nextjs' | 'astro' | 'hugo' | 'jekyll' | 'docusaurus' | 'eleventy' | 'nuxt' | 'generic';
 
-/** folder: `<slug>/index.mdx` · flat: `<slug>.md` · dated: `2026-09-28-<slug>.md` (Jekyll). */
-export type PostLayout = 'folder' | 'flat' | 'dated';
+/**
+ * folder: `<slug>/index.mdx` · flat: `<slug>.md` · dated: `2026-09-28-<slug>.md` (Jekyll).
+ * tree (notes): `<folder>/<sub>/<slug>.md` at any depth; the slug is the whole relative path.
+ */
+export type PostLayout = 'folder' | 'flat' | 'dated' | 'tree';
 
 export type FrontmatterFormat = 'yaml' | 'toml';
 
@@ -142,9 +145,21 @@ export interface ProjectInfo {
   contentDirs: { path: string; posts: number }[];
 }
 
+/** Personal / study notes: nested folders, no site generator, no SEO. */
+export const NOTES_PROFILE: SiteProfile = { framework: 'generic', layout: 'tree', extension: '.md', frontmatter: 'yaml' };
+
+export const NOTE_FIELDS: MetadataField[] = [
+  { id: 'note-title', name: 'title', type: 'text', required: true },
+  { id: 'note-tags', name: 'tags', type: 'tags', required: false },
+  { id: 'note-created', name: 'created', type: 'date', required: false },
+  { id: 'note-status', name: 'status', type: 'select', required: false, options: ['todo', 'learning', 'done'] },
+];
+
+export type WorkspaceKind = 'local' | 'dev' | 'notes';
+
 export interface Workspace {
   id: string;
-  kind?: 'local' | 'dev';
+  kind?: WorkspaceKind;
   devUsername?: string;
   name: string;
   icon: string;

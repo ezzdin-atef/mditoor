@@ -25,7 +25,13 @@ impl PostProfile {
     /// `folder`: `<slug>/index.<ext>`. `flat` and `dated`: `<slug>.<ext>` (for `dated`
     /// the slug is the whole file stem, date prefix included).
     fn is_folder(&self) -> bool {
-        !matches!(self.layout.as_str(), "flat" | "dated")
+        !matches!(self.layout.as_str(), "flat" | "dated" | "tree")
+    }
+
+    /// `tree` (notes): `<folder>/<sub>/<slug>.<ext>` at any depth; the slug is the
+    /// relative path without the extension, e.g. `math/calculus/limits`.
+    fn is_tree(&self) -> bool {
+        self.layout == "tree"
     }
 
     /// Extension used when creating a post.
@@ -45,6 +51,22 @@ fn check_slug(slug: &str) -> Result<(), String> {
     Ok(())
 }
 
+// A note path is one or more `/`-separated slugs, each checked like a post slug.
+fn check_note_path(path: &str) -> Result<(), String> {
+    if path.is_empty() {
+        return Err("Invalid note path: empty".into());
+    }
+    for segment in path.split('/') {
+        check_slug(segment).map_err(|_| format!("Invalid note path: {path}"))?;
+    }
+    Ok(())
+}
+
+// Folders that never hold notes: dot folders (.git, .obsidian) and dependencies.
+fn skip_note_dir(name: &str) -> bool {
+    name.starts_with('.') || name == "node_modules"
+}
+
 fn post_ext(p: &Path) -> Option<String> {
     p.extension()
         .and_then(|e| e.to_str())
@@ -59,7 +81,7 @@ fn folder_index(dir: &Path) -> Option<std::path::PathBuf> {
 
 /// The post's markdown file: the existing one, or where a new one should be written.
 fn post_file(mdx_path: &str, slug: &str, profile: &PostProfile) -> Result<std::path::PathBuf, String> {
-    check_slug(slug)?;
+    if profile.is_tree() { check_note_path(slug)? } else { check_slug(slug)? }
     let root = Path::new(mdx_path);
     if profile.is_folder() {
         let dir = root.join(slug);
@@ -82,6 +104,11 @@ fn find_posts(path: &str, profile: &PostProfile) -> Result<Vec<(String, std::pat
         return Err(format!("Path is not a directory: {}", path));
     }
     let mut posts = Vec::new();
+    if profile.is_tree() {
+        collect_notes(dir, dir, &mut posts);
+        posts.sort_by(|a, b| a.0.cmp(&b.0));
+        return Ok(posts);
+    }
     for entry in fs::read_dir(dir).map_err(|e| e.to_string())?.flatten() {
         let ep = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
@@ -99,6 +126,86 @@ fn find_posts(path: &str, profile: &PostProfile) -> Result<Vec<(String, std::pat
     }
     posts.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(posts)
+}
+
+// Every markdown file under `dir` as (relative path without extension, file).
+fn collect_notes(dir: &Path, base: &Path, out: &mut Vec<(String, std::path::PathBuf)>) {
+    let Ok(entries) = fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        let p = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+        if p.is_dir() {
+            if !skip_note_dir(&name) {
+                collect_notes(&p, base, out);
+            }
+        } else if post_ext(&p).is_some() && !name.starts_with('.') {
+            let rel = p.with_extension("");
+            let rel = rel.strip_prefix(base).unwrap_or(&rel).to_string_lossy().replace('\\', "/");
+            // A name that isn't a valid slug (e.g. `a:b.md`) could not be opened again.
+            if check_note_path(&rel).is_ok() {
+                out.push((rel, p));
+            }
+        }
+    }
+}
+
+// Relative paths of every folder under `dir`, so empty folders show up too.
+fn collect_note_folders(dir: &Path, base: &Path, out: &mut Vec<String>) {
+    let Ok(entries) = fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        let p = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+        if p.is_dir() && !skip_note_dir(&name) {
+            out.push(p.strip_prefix(base).unwrap_or(&p).to_string_lossy().replace('\\', "/"));
+            collect_note_folders(&p, base, out);
+        }
+    }
+}
+
+fn list_note_folders(mdx_path: String) -> Result<Vec<String>, String> {
+    let dir = Path::new(&mdx_path);
+    if !dir.is_dir() {
+        return Err(format!("Path is not a directory: {}", mdx_path));
+    }
+    let mut folders = Vec::new();
+    collect_note_folders(dir, dir, &mut folders);
+    folders.sort();
+    Ok(folders)
+}
+
+fn create_note_folder(mdx_path: String, folder: String) -> Result<(), String> {
+    check_note_path(&folder)?;
+    fs::create_dir_all(Path::new(&mdx_path).join(&folder)).map_err(|e| e.to_string())
+}
+
+/// Removes a folder only when nothing is left in it, so notes are never deleted by accident.
+fn delete_note_folder(mdx_path: String, folder: String) -> Result<(), String> {
+    check_note_path(&folder)?;
+    let dir = Path::new(&mdx_path).join(&folder);
+    fs::remove_dir(&dir).map_err(|e| format!("{}: {}", dir.display(), e))
+}
+
+/// Renames or moves a note (`from` and `to` are note paths). Refuses to overwrite.
+fn move_note(mdx_path: String, from: String, to: String, profile: Option<PostProfile>) -> Result<String, String> {
+    let profile = profile.unwrap_or_default();
+    if !profile.is_tree() {
+        return Err("Moving is only supported for notes".into());
+    }
+    check_note_path(&to)?;
+    let src = post_file(&mdx_path, &from, &profile)?;
+    if !src.is_file() {
+        return Err(format!("Not a note: {}", src.display()));
+    }
+    let ext = src.extension().and_then(|e| e.to_str()).unwrap_or(profile.ext()).to_string();
+    let dest = Path::new(&mdx_path).join(format!("{to}.{ext}"));
+    if dest.exists() {
+        return Err(format!("Already exists: {}", dest.display()));
+    }
+    if let Some(dir) = dest.parent() {
+        fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    fs::rename(&src, &dest).map_err(|e| e.to_string())?;
+    Ok(to)
 }
 
 fn list_mdx_slugs(path: String, profile: Option<PostProfile>) -> Result<Vec<String>, String> {
@@ -281,6 +388,10 @@ fn resolve_post_image(mdx_path: String, slug: String, src: String, hints: Option
                 candidates.push(Path::new(dir).join(rest));
             }
         }
+    }
+    // Notes link images relative to the note's own folder (`math/limits` -> `math/`).
+    if let Some((folder, _)) = slug.rsplit_once('/') {
+        candidates.push(root.join(folder).join(clean));
     }
     if !slug.is_empty() {
         candidates.push(root.join(&slug).join(clean));
@@ -1799,6 +1910,10 @@ mod cmd {
     blocking!(delete_post(mdx_path: String, slug: String, profile: Option<PostProfile>) -> ());
     blocking!(config_locations(workspace_paths: Vec<String>) -> ConfigLocations);
     blocking!(write_ideas(mdx_path: String, content: String) -> ());
+    blocking!(list_note_folders(mdx_path: String) -> Vec<String>);
+    blocking!(create_note_folder(mdx_path: String, folder: String) -> ());
+    blocking!(delete_note_folder(mdx_path: String, folder: String) -> ());
+    blocking!(move_note(mdx_path: String, from: String, to: String, profile: Option<PostProfile>) -> String);
 
     #[tauri::command]
     pub(crate) async fn dev_connect(workspace_id: String, api_key: String, expected_username: Option<String>) -> Result<serde_json::Value, String> {
@@ -1916,6 +2031,10 @@ pub fn run() {
             cmd::delete_post,
             cmd::config_locations,
             cmd::write_ideas,
+            cmd::list_note_folders,
+            cmd::create_note_folder,
+            cmd::delete_note_folder,
+            cmd::move_note,
             upload_to_s3,
         ])
         .run(tauri::generate_context!())
@@ -2081,6 +2200,40 @@ mod tests {
         fs::create_dir_all(root.join("bundle")).unwrap();
         fs::write(root.join("bundle").join("index.md"), "# b").unwrap();
         assert_eq!(list_mdx_slugs(ws, None).unwrap(), vec!["bundle".to_string()]);
+        let _ = fs::remove_dir_all(&root);
+    }
+    #[test]
+    fn tree_layout_handles_nested_notes_and_folders() {
+        let root = std::env::temp_dir().join(format!("mditoor-tree-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join(".git")).unwrap();
+        fs::write(root.join(".git").join("x.md"), "").unwrap();
+        fs::write(root.join("inbox.md"), "# hi").unwrap();
+        let ws = root.to_string_lossy().to_string();
+        let tree = || Some(PostProfile { layout: "tree".into(), extension: ".md".into() });
+
+        write_post(ws.clone(), "math/calculus/limits".into(), "# L".into(), tree()).unwrap();
+        assert!(root.join("math/calculus/limits.md").is_file());
+        create_note_folder(ws.clone(), "physics".into()).unwrap();
+
+        let slugs = list_mdx_slugs(ws.clone(), tree()).unwrap();
+        assert_eq!(slugs, ["inbox", "math/calculus/limits"]);
+        assert_eq!(list_note_folders(ws.clone()).unwrap(), ["math", "math/calculus", "physics"]);
+        assert_eq!(read_post(ws.clone(), "math/calculus/limits".into(), tree()).unwrap(), "# L");
+
+        for bad in ["../x", "a//b", "/a", "a/../b", "a\\b"] {
+            assert!(read_post(ws.clone(), bad.into(), tree()).is_err(), "accepted {bad:?}");
+        }
+
+        move_note(ws.clone(), "inbox".into(), "physics/inbox".into(), tree()).unwrap();
+        assert!(root.join("physics/inbox.md").is_file());
+        assert!(move_note(ws.clone(), "math/calculus/limits".into(), "physics/inbox".into(), tree()).is_err());
+
+        // Non-empty folders are kept.
+        assert!(delete_note_folder(ws.clone(), "physics".into()).is_err());
+        delete_post(ws.clone(), "physics/inbox".into(), tree()).unwrap();
+        delete_note_folder(ws, "physics".into()).unwrap();
+        assert!(!root.join("physics").exists());
         let _ = fs::remove_dir_all(&root);
     }
     #[test]

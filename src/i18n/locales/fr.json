@@ -80,7 +80,8 @@
       "images": "Images",
       "config": "Config",
       "settings": "Paramètres",
-      "ideas": "Idées"
+      "ideas": "Idées",
+      "notes": "Notes"
     },
     "created": "Espace « {{name}} » créé",
     "createFailed": "Impossible de créer l'espace",
@@ -104,6 +105,38 @@
       "folder": "Un dossier par article",
       "flat": "Fichier unique",
       "dated": "Fichier daté (Jekyll)"
+    },
+    "creating": "Création…",
+    "types": {
+      "question": "Qu’allez-vous écrire ici ? Choisissez un type ; les détails se modifient ensuite dans les Réglages.",
+      "gitHint": "Lance git init pour versionner chaque modification. Validez et poussez depuis l’onglet Git.",
+      "local": {
+        "title": "Projet de site",
+        "desc": "Articles dans le dépôt d’un site : Next.js, Astro, Hugo, Jekyll et plus.",
+        "best": "Idéal pour blogs et docs",
+        "point1": "Détecte le framework et le dossier des articles",
+        "point2": "Contrôles SEO, images de couverture, métadonnées",
+        "point3": "Écrit des fichiers que votre site compile déjà",
+        "footer": "Rien n’est déplacé ; Mditoor modifie les fichiers sur place."
+      },
+      "notes": {
+        "title": "Notes",
+        "desc": "Notes personnelles ou d’étude dans des dossiers imbriqués. Markdown avec frontmatter.",
+        "best": "Idéal pour études, recherche, journal",
+        "point1": "Dossiers et sous-dossiers, à toute profondeur",
+        "point2": "Titre, tags, statut ; sans SEO",
+        "point3": "Dépôt Git facultatif pour synchroniser et sauvegarder",
+        "footer": "Le dossier est créé s’il n’existe pas encore."
+      },
+      "dev": {
+        "title": "DEV.to",
+        "desc": "Écrivez et publiez directement sur votre compte DEV. Aucun dépôt requis.",
+        "best": "Idéal pour publier sur DEV",
+        "point1": "Importe vos articles existants",
+        "point2": "Brouillons enregistrés localement, hors ligne",
+        "point3": "Publiez ou synchronisez en un clic",
+        "footer": "Votre clé API reste uniquement sur cet ordinateur."
+      }
     }
   },
   "posts": {
@@ -642,6 +675,17 @@
     "reveal": "Afficher dans le dossier",
     "revealFailed": "Impossible d'ouvrir le dossier",
     "localStorageNote": "Les préférences d'affichage (galerie ou liste, largeur du panneau, tri) sont stockées localement sur cette machine.",
+    "workspacesGroup": "Espaces de travail",
+    "search": "Filtrer les espaces…",
+    "expandAll": "Tout déplier",
+    "collapseAll": "Tout replier",
+    "current": "Ouvert",
+    "openFolder": "Ouvrir le dossier de l'espace",
+    "fileCount_one": "{{count}} fichier",
+    "fileCount_other": "{{count}} fichiers",
+    "missingCount_one": "{{count}} non créé",
+    "missingCount_other": "{{count}} non créés",
+    "noMatch": "Aucun espace ne correspond à « {{query}} »",
     "desc": {
       "settings_json": "Paramètres de l'application : thème, langue, police et sauvegarde auto.",
       "workspaces_json": "Liste de vos espaces : noms, icônes et dossiers.",
@@ -704,5 +748,47 @@
     "pill": "Mise à jour disponible",
     "availableToast": "Mditoor {{version}} est disponible",
     "availableToastHint": "Cliquez sur « Mise à jour disponible » dans la barre de titre, ou ouvrez les Paramètres, pour l’installer."
+  },
+  "notes": {
+    "type": "Notes",
+    "workspaceHint": "Notes personnelles ou d'étude dans des dossiers. Sans site, sans SEO.",
+    "folder": "Dossier de notes",
+    "folderHelp": "Choisissez un dossier existant ou saisissez un nouveau chemin ; il sera créé s'il n'existe pas.",
+    "namePlaceholder": "Cours, Journal, Lectures...",
+    "useGit": "Suivre avec Git",
+    "remote": "Dépôt distant (facultatif)",
+    "remoteHint": "Validez et poussez depuis l'onglet Git. Laissez vide pour l'ajouter plus tard.",
+    "folders": "Dossiers",
+    "allNotes": "Toutes les notes",
+    "new": "Nouvelle note",
+    "newIn": "Nouvelle note dans {{folder}}",
+    "newFolder": "Nouveau dossier",
+    "newFolderIn": "Nouveau dossier dans {{folder}}",
+    "folderName": "Nom du dossier",
+    "folderHint": "Utilisez / pour créer des dossiers imbriqués, par ex. math/analyse.",
+    "search": "Rechercher dans toutes les notes…",
+    "searchResults_one": "{{count}} résultat dans tous les dossiers",
+    "searchResults_other": "{{count}} résultats dans tous les dossiers",
+    "location": "Emplacement",
+    "contents": "Contenu du dossier",
+    "count_one": "{{count}} note",
+    "count_other": "{{count}} notes",
+    "emptyFolder": "Ce dossier est vide",
+    "emptyHint": "Ajoutez une note ici, ou créez un sous-dossier pour organiser vos notes.",
+    "move": "Renommer ou déplacer…",
+    "moveButton": "Déplacer",
+    "notePath": "Chemin",
+    "moveHint": "Chemin du dossier et nom du fichier sans {{ext}}, par ex. math/limites.",
+    "moveFailed": "Impossible de déplacer la note",
+    "invalidPath": "Les noms ne peuvent pas être vides, contenir \\ ou :, ni valoir . ou ..",
+    "deleteNote": "Supprimer la note…",
+    "deleteFolder": "Supprimer le dossier",
+    "folderNotEmpty": "Seuls les dossiers vides peuvent être supprimés",
+    "folderFailed": "Impossible de créer le dossier",
+    "sort": {
+      "updated": "Modifiées récemment",
+      "date": "Création",
+      "title": "Titre"
+    }
   }
 }

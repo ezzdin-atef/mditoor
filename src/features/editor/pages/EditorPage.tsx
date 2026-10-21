@@ -15,7 +15,7 @@ import { FloatingToolbar } from '../components/FloatingToolbar';
 import { BlockEditor } from '../components/BlockEditor';
 import { MetadataSidebar } from '../components/MetadataSidebar';
 import { EditorImagesProvider, ResolvedHtml } from '../components/EditorImages';
-import { IconArrowLeft, IconCheck, IconAlert, IconFolder, IconTrash } from '../../../components/Icons';
+import { IconArrowLeft, IconCheck, IconAlert, IconFolder, IconLink, IconTrash } from '../../../components/Icons';
 import { ActionMenu } from '../../../components/ActionMenu';
 import { usePostDelete } from '../../posts/usePostDelete';
 import { postFileName } from '../../posts/postMeta';
@@ -33,6 +33,37 @@ import {
 } from '../utils/frontmatter';
 
 type ViewMode = 'edit' | 'split' | 'preview';
+
+// Each text block picks its own direction from its first strong character, so an Arabic
+// paragraph after an English one is right-to-left (one dir on the whole preview can't do that).
+const AUTO_DIR_BLOCKS = 'p, h1, h2, h3, h4, h5, h6, li, th, td, dt, dd, figcaption, summary';
+// `dir="auto"` skips children that have their own dir, so containers would always come out
+// left-to-right; they get an explicit direction from their text instead (bullet side, borders).
+const CONTAINER_BLOCKS = 'ul, ol, blockquote, table, dl, details';
+
+const RTL_CHAR = /[֐-ࣿיִ-﷿ﹰ-﻿]/;
+
+/** Direction of the first letter in `text`, or null when it has none. */
+function firstStrongDir(text: string): 'rtl' | 'ltr' | null {
+  const m = /\p{L}/u.exec(text);
+  return m ? (RTL_CHAR.test(m[0]) ? 'rtl' : 'ltr') : null;
+}
+
+/** Gives each preview block its own text direction; code stays left-to-right. */
+function withBlockDirection(html: string): string {
+  // A <template> parses without loading images or running anything.
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  tpl.content.querySelectorAll('pre').forEach(el => el.setAttribute('dir', 'ltr'));
+  tpl.content.querySelectorAll(CONTAINER_BLOCKS).forEach(el => {
+    const dir = firstStrongDir(el.textContent ?? '');
+    if (dir && !el.hasAttribute('dir')) el.setAttribute('dir', dir);
+  });
+  tpl.content.querySelectorAll(AUTO_DIR_BLOCKS).forEach(el => {
+    if (!el.hasAttribute('dir') && !el.closest('pre')) el.setAttribute('dir', 'auto');
+  });
+  return tpl.innerHTML;
+}
 type EditorMode = 'blocks' | 'markdown';
 type EditorRoute = Extract<Route, { page: 'editor' }>;
 
@@ -347,7 +378,7 @@ function EditorScreen({ route }: { route: EditorRoute }) {
 
   const previewHtml = useMemo(() => {
     if (viewMode === 'edit') return '';
-    try { return marked.parse(body) as string; }
+    try { return withBlockDirection(marked.parse(body) as string); }
     catch { return body; }
   }, [body, viewMode]);
 
@@ -370,14 +401,7 @@ function EditorScreen({ route }: { route: EditorRoute }) {
     <div className="flex flex-col h-full overflow-hidden" style={{ background: 'var(--bg)' }}>
       {/* ═══ Header ═══ */}
       <header className="editor-header flex items-center gap-2 px-3 flex-shrink-0 border-b">
-        {workspace.kind === 'dev' && <>
-          {devEntry?.conflict && <span className="text-[12px]" role="status" style={{ color: 'var(--red)' }}>{t('dev.conflict')}</span>}
-          {devEntry?.url && <button type="button" className="mac-btn flex-shrink-0" onClick={() => void openUrl(devEntry.url!)}>{t('dev.viewOnDev')}</button>}
-          <button type="button" className="mac-btn flex-shrink-0" disabled={!devEntryReady || devSyncing || saving || loading || devEntry?.conflict} onClick={() => void syncToDev(devEntry?.published ?? false)}>
-            {devSyncing ? t('dev.syncing') : devEntry?.published ? t('dev.syncChanges') : t('dev.saveDraft')}
-          </button>
-          {!devEntry?.published && <button type="button" className="mac-btn mac-btn-fun flex-shrink-0" disabled={!devEntryReady || devSyncing || saving || loading || devEntry?.conflict} onClick={() => void syncToDev(true)}>{t('dev.publish')}</button>}
-        </>}
+        {/* Back always comes first; DEV actions sit with the other actions on the end side. */}
         <button
           onClick={() => void goBack()}
           className="editor-back-btn flex items-center gap-2 flex-shrink-0"
@@ -400,6 +424,9 @@ function EditorScreen({ route }: { route: EditorRoute }) {
             </span>
           )}
           {route.isNew && <span className="badge badge-accent flex-shrink-0">{t('editor.new')}</span>}
+          {workspace.kind === 'dev' && devEntry?.conflict && (
+            <span className="badge badge-red flex-shrink-0" role="status">{t('dev.conflict')}</span>
+          )}
         </div>
 
         {/* Save status */}
@@ -445,15 +472,46 @@ function EditorScreen({ route }: { route: EditorRoute }) {
         <button
           onClick={() => void save()}
           disabled={saving || !dirty}
-          className="mac-btn mac-btn-primary flex-shrink-0"
+          // In DEV workspaces Publish is the main action, so the local save stays quiet.
+          className={`mac-btn${workspace.kind === 'dev' ? '' : ' mac-btn-primary'} flex-shrink-0`}
         >
           {saving ? t('editor.saving') : t('editor.save')}
         </button>
 
+        {workspace.kind === 'dev' && (
+          <div className="editor-dev-actions flex items-center gap-2 flex-shrink-0">
+            <button
+              type="button"
+              className="mac-btn flex-shrink-0"
+              disabled={!devEntryReady || devSyncing || saving || loading || devEntry?.conflict}
+              onClick={() => void syncToDev(devEntry?.published ?? false)}
+            >
+              {devSyncing ? t('dev.syncing') : devEntry?.published ? t('dev.syncChanges') : t('dev.saveDraft')}
+            </button>
+            {!devEntry?.published && (
+              <button
+                type="button"
+                className="mac-btn mac-btn-fun flex-shrink-0"
+                disabled={!devEntryReady || devSyncing || saving || loading || devEntry?.conflict}
+                onClick={() => void syncToDev(true)}
+              >
+                {t('dev.publish')}
+              </button>
+            )}
+          </div>
+        )}
+
         <ActionMenu
           label={t('posts.actions.more')}
           items={[
-            ...(workspace.kind !== 'dev' && devTargets.length > 0 ? [{
+            // A secondary link, so it lives in the menu rather than the header row.
+            ...(workspace.kind === 'dev' && devEntry?.url ? [{
+              label: t('dev.viewOnDev'),
+              icon: <IconLink size={14} />,
+              onSelect: () => void openUrl(devEntry.url!),
+            }] : []),
+            // Notes are private; only site posts can be cross-posted.
+            ...((workspace.kind ?? 'local') === 'local' && devTargets.length > 0 ? [{
               label: t('dev.sendToDev'),
               icon: <IconCheck size={14} />,
               onSelect: () => { setCrossTargetId(devTargets[0].id); setShowCrosspost(true); },
@@ -510,6 +568,7 @@ function EditorScreen({ route }: { route: EditorRoute }) {
               slug={route.slug}
               onUploadImage={handleUploadImage}
               devMode={workspace.kind === 'dev'}
+              hideSeo={workspace.kind === 'notes'}
             />
           )}
 

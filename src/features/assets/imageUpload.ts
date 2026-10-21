@@ -70,6 +70,11 @@ async function saveLocal(filePath: string, workspace: UploadWorkspace, slug?: st
   if (slug && workspace.profile.layout === 'folder') {
     return `./${await copy(joinPath(workspace.mdxPath, slug))}`;
   }
+  // Notes: an images/ folder beside the note, so `./images/x.png` resolves from nested folders too.
+  if (slug && workspace.profile.layout === 'tree') {
+    const folder = slug.includes('/') ? slug.slice(0, slug.lastIndexOf('/')) : '';
+    return `./images/${await copy(joinPath(folder ? joinPath(workspace.mdxPath, folder) : workspace.mdxPath, 'images'))}`;
+  }
   return `./images/${await copy(joinPath(workspace.mdxPath, 'images'))}`;
 }
 

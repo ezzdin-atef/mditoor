@@ -80,7 +80,8 @@
       "images": "Images",
       "config": "Config",
       "settings": "Settings",
-      "ideas": "Ideas"
+      "ideas": "Ideas",
+      "notes": "Notes"
     },
     "created": "Workspace \"{{name}}\" created",
     "createFailed": "Couldn't create workspace",
@@ -104,6 +105,38 @@
       "folder": "Folder per post",
       "flat": "Single file",
       "dated": "Dated file (Jekyll)"
+    },
+    "creating": "Creating…",
+    "types": {
+      "question": "What will you write here? Pick a type; you can change the details later in Settings.",
+      "gitHint": "Runs git init so every change is versioned. Commit and push from the Git tab.",
+      "local": {
+        "title": "Site project",
+        "desc": "Posts in a website repo: Next.js, Astro, Hugo, Jekyll and more.",
+        "best": "Best for blogs and docs",
+        "point1": "Detects the framework and posts folder",
+        "point2": "SEO checks, cover images and metadata",
+        "point3": "Writes files your site already builds",
+        "footer": "Nothing is moved; Mditoor edits the files in place."
+      },
+      "notes": {
+        "title": "Notes",
+        "desc": "Personal or study notes in nested folders. Markdown with frontmatter.",
+        "best": "Best for study, research, journals",
+        "point1": "Folders and subfolders, any depth",
+        "point2": "Title, tags, status; no SEO",
+        "point3": "Optional Git repo to sync and back up",
+        "footer": "The folder is created if it does not exist yet."
+      },
+      "dev": {
+        "title": "DEV.to",
+        "desc": "Write and publish straight to your DEV account. No repo needed.",
+        "best": "Best for posting on DEV",
+        "point1": "Imports your existing articles",
+        "point2": "Drafts are saved locally, work offline",
+        "point3": "Publish or sync with one click",
+        "footer": "Your API key is stored only on this computer."
+      }
     }
   },
   "posts": {
@@ -642,6 +675,17 @@
     "reveal": "Show in folder",
     "revealFailed": "Couldn't open the folder",
     "localStorageNote": "View preferences (gallery or list, sidebar width, sort order) are stored per machine in the app's local browser storage.",
+    "workspacesGroup": "Workspaces",
+    "search": "Filter workspaces…",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "current": "Open",
+    "openFolder": "Open workspace folder",
+    "fileCount_one": "{{count}} file",
+    "fileCount_other": "{{count}} files",
+    "missingCount_one": "{{count}} not created",
+    "missingCount_other": "{{count}} not created",
+    "noMatch": "No workspace matches “{{query}}”",
     "desc": {
       "settings_json": "App settings: theme, language, editor font and auto-save.",
       "workspaces_json": "Your workspace list: names, icons and folder paths.",
@@ -704,5 +748,47 @@
     "pill": "Update available",
     "availableToast": "Mditoor {{version}} is available",
     "availableToastHint": "Click “Update available” in the title bar, or open Settings, to install it."
+  },
+  "notes": {
+    "type": "Notes",
+    "workspaceHint": "Personal or study notes in folders. No site, no SEO.",
+    "folder": "Notes folder",
+    "folderHelp": "Pick an existing folder or type a new path; it is created if missing.",
+    "namePlaceholder": "Study notes, Journal, Reading...",
+    "useGit": "Track with Git",
+    "remote": "Remote repository (optional)",
+    "remoteHint": "Commit and push from the Git tab. Leave empty to add a remote later.",
+    "folders": "Folders",
+    "allNotes": "All notes",
+    "new": "New Note",
+    "newIn": "New note in {{folder}}",
+    "newFolder": "New folder",
+    "newFolderIn": "New folder in {{folder}}",
+    "folderName": "Folder name",
+    "folderHint": "Use / to create nested folders, e.g. math/calculus.",
+    "search": "Search all notes…",
+    "searchResults_one": "{{count}} match in all folders",
+    "searchResults_other": "{{count}} matches in all folders",
+    "location": "Location",
+    "contents": "Folder contents",
+    "count_one": "{{count}} note",
+    "count_other": "{{count}} notes",
+    "emptyFolder": "This folder is empty",
+    "emptyHint": "Add a note here, or create a subfolder to organize your notes.",
+    "move": "Rename or move…",
+    "moveButton": "Move",
+    "notePath": "Path",
+    "moveHint": "Folder path and file name without {{ext}}, e.g. math/limits.",
+    "moveFailed": "Couldn't move the note",
+    "invalidPath": "Names cannot be empty or contain \\ or :, and cannot be . or ..",
+    "deleteNote": "Delete note…",
+    "deleteFolder": "Delete folder",
+    "folderNotEmpty": "Only empty folders can be deleted",
+    "folderFailed": "Couldn't create the folder",
+    "sort": {
+      "updated": "Recently edited",
+      "date": "Created",
+      "title": "Title"
+    }
   }
 }

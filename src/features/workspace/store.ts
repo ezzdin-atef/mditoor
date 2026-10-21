@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
-import { DEFAULT_PROFILE, DEFAULT_STORAGE, FRAMEWORK_PRESETS, normalizeProfile, normalizeStorage } from './types';
+import { DEFAULT_PROFILE, DEFAULT_STORAGE, FRAMEWORK_PRESETS, NOTE_FIELDS, NOTES_PROFILE, normalizeProfile, normalizeStorage } from './types';
 import type { FieldType, Framework, MetadataField, ProjectInfo, SiteProfile, StorageConfig, Workspace } from './types';
 
 const LS_KEY = 'mditoor:workspaces';
@@ -16,7 +16,7 @@ const withWorkspaceDefaults = (w: StoredWorkspace): Workspace => ({
   icon: w.icon ?? DEFAULT_WORKSPACE_ICON,
   metadataFields: [],
   storage: { ...DEFAULT_STORAGE },
-  profile: { ...DEFAULT_PROFILE },
+  profile: { ...(w.kind === 'notes' ? NOTES_PROFILE : DEFAULT_PROFILE) },
 });
 
 const load = (): Workspace[] => {
@@ -94,12 +94,23 @@ export interface NewWorkspace {
   framework?: Framework;
 }
 
+export interface NewNotesWorkspace {
+  name: string;
+  /** Notes folder (absolute); created when missing. */
+  mdxPath: string;
+  icon?: string;
+  /** Run `git init` (and set `origin` when `remote` is given). */
+  git?: boolean;
+  remote?: string;
+}
+
 interface Store {
   workspaces: Workspace[];
   activeId: string | null;
   hydrateWorkspaces: (stored: StoredWorkspace[]) => void;
   addWorkspace: (input: NewWorkspace) => Promise<void>;
   addDevWorkspace: (id: string, username: string) => Promise<void>;
+  addNotesWorkspace: (input: NewNotesWorkspace) => Promise<void>;
   updateWorkspace: (id: string, updates: Partial<Pick<Workspace, 'name' | 'mdxPath' | 'rootPath' | 'icon'>>) => Promise<void>;
   deleteWorkspace: (id: string) => Promise<void>;
   setActive: (id: string | null) => Promise<void>;
@@ -174,6 +185,33 @@ export const useStore = create<Store>((set, get) => ({
     set({ workspaces, activeId: id });
   },
 
+  addNotesWorkspace: async ({ name, mdxPath, icon, git, remote }) => {
+    // Re-opening an existing notes folder keeps its schema and storage.
+    const existing = await readConfig(mdxPath);
+    const w: Workspace = {
+      id: crypto.randomUUID(),
+      kind: 'notes',
+      name,
+      icon: icon || '📚',
+      mdxPath,
+      colorIdx: nextColor++ % 8,
+      metadataFields: existing.metadataFields.length ? existing.metadataFields : NOTE_FIELDS,
+      storage: existing.hasStorage ? existing.storage : { ...DEFAULT_STORAGE },
+      profile: { ...NOTES_PROFILE },
+      createdAt: new Date().toISOString(),
+    };
+    // Writing the config creates the folder.
+    await writeConfig(w);
+    if (git) {
+      const status = await invoke<{ is_repo: boolean }>('git_status', { mdxPath });
+      if (!status.is_repo) await invoke('git_init', { mdxPath });
+      if (remote?.trim()) await invoke('git_set_remote', { mdxPath, url: remote.trim() });
+    }
+    const workspaces = [...get().workspaces, w];
+    save(workspaces);
+    set({ workspaces, activeId: w.id });
+  },
+
   updateWorkspace: async (id, updates) => {
     const current = get().workspaces.find(w => w.id === id);
     if (!current) return;
@@ -220,8 +258,10 @@ export const useStore = create<Store>((set, get) => ({
     const fields = workspace.kind === 'dev'
       ? metadataFields.map(field => field.name === 'main_image' ? { ...field, type: 'image' as const } : field)
       : metadataFields;
+    // Notes are always nested files, whatever an old or hand-edited config says.
+    const layoutProfile = workspace.kind === 'notes' ? { ...profile, layout: 'tree' as const } : profile;
     const workspaces = get().workspaces.map(w =>
-      w.id === id ? { ...w, metadataFields: fields, storage, profile, rootPath } : w,
+      w.id === id ? { ...w, metadataFields: fields, storage, profile: layoutProfile, rootPath } : w,
     );
     set({ workspaces });
     if (rootPath !== workspace.rootPath) save(workspaces);

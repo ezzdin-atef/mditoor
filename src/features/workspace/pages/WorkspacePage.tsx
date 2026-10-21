@@ -8,6 +8,7 @@ import { WorkspaceSettingsTab } from '../components/WorkspaceSettingsTab';
 import { GitPanel } from '../../git/components/GitPanel';
 import { AssetGallery } from '../../assets/components/AssetGallery';
 import { PostsView } from '../../posts/PostsView';
+import { NotesView } from '../../notes/NotesView';
 import { IdeasView } from '../../ideas/IdeasView';
 import { useIdeas } from '../../ideas/store';
 import type { PostSummary } from '../../posts/postMeta';
@@ -52,7 +53,10 @@ export function WorkspacePage() {
   const { confirm, confirmationDialog } = useConfirmDialog();
 
   const active = workspaces.find(w => w.id === activeId) ?? null;
-  const visibleTabs = active?.kind === 'dev' ? TABS.filter(tab => ['posts', 'ideas', 'settings'].includes(tab.id)) : TABS;
+  const visibleTabs = active?.kind === 'dev' ? TABS.filter(tab => ['posts', 'ideas', 'settings'].includes(tab.id))
+    : active?.kind === 'notes' ? TABS.filter(tab => tab.id !== 'ideas')
+    : TABS;
+  const tabLabel = (tab: Tab) => t(`workspace.tabs.${tab === 'posts' && active?.kind === 'notes' ? 'notes' : tab}`);
   const ideas = useIdeas(s => (active ? s.byPath[active.mdxPath] : undefined));
   const openIdeas = ideas?.filter(i => i.status !== 'drafted').length ?? 0;
 
@@ -270,10 +274,10 @@ export function WorkspacePage() {
                       aria-selected={isActiveTab}
                       onClick={() => setActiveTab(id)}
                       className={`notion-tab${isActiveTab ? ' active' : ''}`}
-                      title={`${t(`workspace.tabs.${id}`)} (${MOD}${i + 1})`}
+                      title={`${tabLabel(id)} (${MOD}${i + 1})`}
                     >
                       <Icon size={15} />
-                      {t(`workspace.tabs.${id}`)}
+                      {tabLabel(id)}
                       {badge && <span className={`tab-count${badge.attention ? ' attention' : ''}`}>{badge.value}</span>}
                     </button>
                   );
@@ -284,7 +288,17 @@ export function WorkspacePage() {
             <div className="flex-1 overflow-y-auto">
               <div className="page-body" key={`${active.id}:${activeTab}`}>
                 {active.kind === 'dev' && devNotice && <div className="mac-card p-3 mb-4 text-[12px]" role="status" style={{ color: 'var(--text-muted)' }}>{devNotice}</div>}
-                {activeTab === 'posts' ? (
+                {activeTab === 'posts' && active.kind === 'notes' ? (
+                  <NotesView
+                    workspace={active}
+                    posts={posts}
+                    loading={loadingPosts}
+                    error={postsError}
+                    onRefresh={() => fetchPosts(active.mdxPath, active.profile)}
+                    openNew={newPostOpen}
+                    onNewOpened={onNewOpened}
+                  />
+                ) : activeTab === 'posts' ? (
                   <PostsView
                     workspace={active}
                     posts={posts}

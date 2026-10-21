@@ -22,6 +22,7 @@ export function WorkspaceSettingsTab({ workspace }: { workspace: Workspace }) {
   const [icon, setIcon] = useState(workspace.icon);
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
+  const isNotes = workspace.kind === 'notes';
 
   useEffect(() => {
     setName(workspace.name);
@@ -105,7 +106,7 @@ export function WorkspaceSettingsTab({ workspace }: { workspace: Workspace }) {
           </div>
 
           <div>
-            <label className="field-label" htmlFor="ws-settings-path">{t('workspace.postsFolder')}</label>
+            <label className="field-label" htmlFor="ws-settings-path">{t(isNotes ? 'notes.folder' : 'workspace.postsFolder')}</label>
             <div className="flex gap-2">
               <input
                 id="ws-settings-path"
@@ -121,7 +122,7 @@ export function WorkspaceSettingsTab({ workspace }: { workspace: Workspace }) {
             <p className="field-hint">{t('workspace.pathChangeHint')}</p>
           </div>
 
-          <div>
+          {!isNotes && <div>
             <label className="field-label" htmlFor="ws-settings-root">
               {t('workspace.projectRoot')}
               <span className="badge" style={{ marginInlineStart: 8 }}>{FRAMEWORK_PRESETS[workspace.profile.framework].label}</span>
@@ -139,7 +140,7 @@ export function WorkspaceSettingsTab({ workspace }: { workspace: Workspace }) {
               </button>
             </div>
             <p className="field-hint">{t('workspace.projectRootHint')}</p>
-          </div>
+          </div>}
         </div>
       </section>
 
@@ -175,9 +176,11 @@ export function WorkspaceSettingsTab({ workspace }: { workspace: Workspace }) {
 function PostLayoutFields({ profile, onChange }: { profile: SiteProfile; onChange: (p: SiteProfile) => void }) {
   const { t } = useTranslation();
   const layouts: PostLayout[] = ['folder', 'flat', 'dated'];
+  // Notes always use nested files; only the extension is a choice.
+  const isTree = profile.layout === 'tree';
   return (
     <div className="flex flex-wrap items-end gap-3">
-      <div>
+      {!isTree && <div>
         <label className="field-label">{t('workspace.layout.layout')}</label>
         <CustomSelect<PostLayout>
           value={profile.layout}
@@ -187,7 +190,7 @@ function PostLayoutFields({ profile, onChange }: { profile: SiteProfile; onChang
           width={240}
           menuMinWidth={300}
         />
-      </div>
+      </div>}
       <div>
         <label className="field-label">{t('workspace.layout.extension')}</label>
         <CustomSelect<SiteProfile['extension']>
@@ -199,7 +202,7 @@ function PostLayoutFields({ profile, onChange }: { profile: SiteProfile; onChang
         />
       </div>
       <code className="ui-mono text-[11.5px] dir-ltr pb-2" style={{ color: 'var(--text-faint)' }}>
-        {postFileName(profile, profile.layout === 'dated' ? '2026-01-31-my-post' : 'my-post')}
+        {postFileName(profile, profile.layout === 'dated' ? '2026-01-31-my-post' : isTree ? 'math/limits' : 'my-post')}
       </code>
     </div>
   );

@@ -19,6 +19,8 @@ interface Props {
   slug?: string;
   onUploadImage?: () => Promise<string | null>;
   devMode?: boolean;
+  /** Notes are not published, so there is no SEO tab. */
+  hideSeo?: boolean;
 }
 
 export const SIDEBAR_MIN = 240;
@@ -44,9 +46,10 @@ function isFilled(v: MetaValues[string] | undefined) {
 
 /* ─── Shell: resizable, collapsible ──────────────────────────────────── */
 
-export function MetadataSidebar({ fields, values, onChange, body = '', slug = '', onUploadImage, devMode = false }: Props) {
+export function MetadataSidebar({ fields, values, onChange, body = '', slug = '', onUploadImage, devMode = false, hideSeo = false }: Props) {
   const { t } = useTranslation();
-  const { sidebarWidth, sidebarCollapsed, sidebarTab, set } = useViewPrefs();
+  const { sidebarWidth, sidebarCollapsed, sidebarTab: savedTab, set } = useViewPrefs();
+  const sidebarTab = hideSeo ? 'meta' : savedTab;
   const [width, setWidth] = useState(sidebarWidth || SIDEBAR_DEFAULT);
   const [dragging, setDragging] = useState(false);
   const asideRef = useRef<HTMLElement>(null);
@@ -98,9 +101,11 @@ export function MetadataSidebar({ fields, values, onChange, body = '', slug = ''
           <IconLayers size={16} />
           {missingRequired > 0 && <span className="meta-rail-dot" />}
         </button>
-        <button className="meta-rail-item" onClick={() => { set('sidebarTab', 'seo'); set('sidebarCollapsed', false); }} title={t('metadata.seo')}>
-          <span className="meta-rail-score" style={{ color: scoreColor(seo.score) }}>{seo.score}</span>
-        </button>
+        {!hideSeo && (
+          <button className="meta-rail-item" onClick={() => { set('sidebarTab', 'seo'); set('sidebarCollapsed', false); }} title={t('metadata.seo')}>
+            <span className="meta-rail-score" style={{ color: scoreColor(seo.score) }}>{seo.score}</span>
+          </button>
+        )}
       </aside>
     );
   }
@@ -120,15 +125,17 @@ export function MetadataSidebar({ fields, values, onChange, body = '', slug = ''
               <span className={`tab-count${missingRequired ? ' attention' : ''}`}>{filled}/{fields.length}</span>
             )}
           </button>
-          <button
-            role="tab"
-            aria-selected={sidebarTab === 'seo'}
-            className={`mac-segment flex-1${sidebarTab === 'seo' ? ' active' : ''}`}
-            onClick={() => set('sidebarTab', 'seo')}
-          >
-            <IconSearch size={13} />{t('metadata.seo')}
-            <span className="tab-count" style={{ color: scoreColor(seo.score) }}>{seo.score}</span>
-          </button>
+          {!hideSeo && (
+            <button
+              role="tab"
+              aria-selected={sidebarTab === 'seo'}
+              className={`mac-segment flex-1${sidebarTab === 'seo' ? ' active' : ''}`}
+              onClick={() => set('sidebarTab', 'seo')}
+            >
+              <IconSearch size={13} />{t('metadata.seo')}
+              <span className="tab-count" style={{ color: scoreColor(seo.score) }}>{seo.score}</span>
+            </button>
+          )}
         </div>
         <button className="icon-btn icon-btn-sm" onClick={() => set('sidebarCollapsed', true)} title={t('meta.collapse')} aria-label={t('meta.collapse')}>
           <IconChevronLeft size={14} mirror />
