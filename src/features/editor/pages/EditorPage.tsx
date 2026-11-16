@@ -13,6 +13,7 @@ import {
 } from '../../settings/store';
 import { FloatingToolbar } from '../components/FloatingToolbar';
 import { BlockEditor } from '../components/BlockEditor';
+import { detectDir } from '../blocks/model';
 import { MetadataSidebar } from '../components/MetadataSidebar';
 import { EditorImagesProvider, ResolvedHtml } from '../components/EditorImages';
 import { IconArrowLeft, IconCheck, IconAlert, IconFolder, IconLink, IconTrash } from '../../../components/Icons';
@@ -34,20 +35,11 @@ import {
 
 type ViewMode = 'edit' | 'split' | 'preview';
 
-// Each text block picks its own direction from its first strong character, so an Arabic
-// paragraph after an English one is right-to-left (one dir on the whole preview can't do that).
+// Each text block picks its own direction from its text, so an Arabic paragraph after an
+// English one is right-to-left (one dir on the whole preview can't do that).
 const AUTO_DIR_BLOCKS = 'p, h1, h2, h3, h4, h5, h6, li, th, td, dt, dd, figcaption, summary';
-// `dir="auto"` skips children that have their own dir, so containers would always come out
-// left-to-right; they get an explicit direction from their text instead (bullet side, borders).
+// Containers get a direction too, for the bullet side and borders.
 const CONTAINER_BLOCKS = 'ul, ol, blockquote, table, dl, details';
-
-const RTL_CHAR = /[֐-ࣿיִ-﷿ﹰ-﻿]/;
-
-/** Direction of the first letter in `text`, or null when it has none. */
-function firstStrongDir(text: string): 'rtl' | 'ltr' | null {
-  const m = /\p{L}/u.exec(text);
-  return m ? (RTL_CHAR.test(m[0]) ? 'rtl' : 'ltr') : null;
-}
 
 /** Gives each preview block its own text direction; code stays left-to-right. */
 function withBlockDirection(html: string): string {
@@ -55,12 +47,14 @@ function withBlockDirection(html: string): string {
   const tpl = document.createElement('template');
   tpl.innerHTML = html;
   tpl.content.querySelectorAll('pre').forEach(el => el.setAttribute('dir', 'ltr'));
-  tpl.content.querySelectorAll(CONTAINER_BLOCKS).forEach(el => {
-    const dir = firstStrongDir(el.textContent ?? '');
-    if (dir && !el.hasAttribute('dir')) el.setAttribute('dir', dir);
-  });
-  tpl.content.querySelectorAll(AUTO_DIR_BLOCKS).forEach(el => {
-    if (!el.hasAttribute('dir') && !el.closest('pre')) el.setAttribute('dir', 'auto');
+  // Same rule as the block editor (the script with more letters wins), so a paragraph
+  // reads the same way in both panes.
+  tpl.content.querySelectorAll(`${CONTAINER_BLOCKS}, ${AUTO_DIR_BLOCKS}`).forEach(el => {
+    if (el.hasAttribute('dir') || el.closest('pre')) return;
+    const prose = el.cloneNode(true) as Element;
+    prose.querySelectorAll('code').forEach(code => code.remove());
+    const dir = detectDir(prose.textContent ?? '');
+    if (dir) el.setAttribute('dir', dir);
   });
   return tpl.innerHTML;
 }
@@ -360,7 +354,8 @@ function EditorScreen({ route }: { route: EditorRoute }) {
     const handler = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
-      if (e.key.toLowerCase() === 's') { e.preventDefault(); void save(); return; }
+      // `code` is the physical key, so Ctrl+S also saves on an Arabic keyboard layout.
+      if (e.code === 'KeyS' && !e.shiftKey && !e.altKey) { e.preventDefault(); void save(); return; }
       // Formatting shortcuts target the raw textarea; block mode handles its own.
       if (editorMode !== 'markdown') return;
       if (e.shiftKey && e.key.toLowerCase() === 'i') { e.preventDefault(); void handleInsertImage(); return; }

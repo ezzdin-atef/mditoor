@@ -1,68 +1,20 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import hljs from 'highlight.js/lib/core';
-import { CustomSelect } from '../../../components/CustomSelect';
-import { ResolvedImg, useEditorImages, useInlineImages, usePreparedImages } from './EditorImages';
-import langBash from 'highlight.js/lib/languages/bash';
-import langC from 'highlight.js/lib/languages/c';
-import langCpp from 'highlight.js/lib/languages/cpp';
-import langCss from 'highlight.js/lib/languages/css';
-import langGo from 'highlight.js/lib/languages/go';
-import langHtml from 'highlight.js/lib/languages/xml';
-import langJava from 'highlight.js/lib/languages/java';
-import langJs from 'highlight.js/lib/languages/javascript';
-import langJson from 'highlight.js/lib/languages/json';
-import langMarkdown from 'highlight.js/lib/languages/markdown';
-import langPhp from 'highlight.js/lib/languages/php';
-import langPython from 'highlight.js/lib/languages/python';
-import langRs from 'highlight.js/lib/languages/rust';
-import langRuby from 'highlight.js/lib/languages/ruby';
-import langShell from 'highlight.js/lib/languages/shell';
-import langSql from 'highlight.js/lib/languages/sql';
-import langSwift from 'highlight.js/lib/languages/swift';
-import langTs from 'highlight.js/lib/languages/typescript';
-import langYaml from 'highlight.js/lib/languages/yaml';
+import { useTranslation } from 'react-i18next';
+import { openUrl } from '@tauri-apps/plugin-opener';
+import { ResolvedImg, useEditorImages } from './EditorImages';
+import { EditableText, type CaretPos, type ChangeInfo, type EditableHandle, type EditableHub } from '../blocks/EditableText';
+import { hrefOf, mdToRuns, plainOf, replaceRange, runsToMd, sliceRuns, type MarkKey, type Marks } from '../blocks/inline';
+import {
+  CALLOUT_EMOJI, CALLOUT_JSX_TYPES, block, blockDirs, calloutParts, isList, isText, listNumbers, newId,
+  normalizeIndents, parseCodeText, parseMarkdownBlocks, serializeMarkdownBlocks, textOf, withText,
+  type Block, type BlockType, type Dir,
+} from '../blocks/model';
+import {
+  BlockContextMenu, CodeBlock, FormatToolbar, SLASH_ITEMS, SlashMenu, TableBlock, TextContextMenu, filterSlashItems,
+  type FormatState, type SlashItem, type TextAction,
+} from '../blocks/widgets';
 
-hljs.registerLanguage('bash', langBash);
-hljs.registerLanguage('c', langC);
-hljs.registerLanguage('cpp', langCpp);
-hljs.registerLanguage('css', langCss);
-hljs.registerLanguage('go', langGo);
-hljs.registerLanguage('html', langHtml);
-hljs.registerLanguage('xml', langHtml);
-hljs.registerLanguage('java', langJava);
-hljs.registerLanguage('javascript', langJs);
-hljs.registerLanguage('js', langJs);
-hljs.registerLanguage('json', langJson);
-hljs.registerLanguage('markdown', langMarkdown);
-hljs.registerLanguage('php', langPhp);
-hljs.registerLanguage('python', langPython);
-hljs.registerLanguage('ruby', langRuby);
-hljs.registerLanguage('rust', langRs);
-hljs.registerLanguage('shell', langShell);
-hljs.registerLanguage('sql', langSql);
-hljs.registerLanguage('swift', langSwift);
-hljs.registerLanguage('typescript', langTs);
-hljs.registerLanguage('ts', langTs);
-hljs.registerLanguage('yaml', langYaml);
-
-type BlockType = 'paragraph' | 'heading1' | 'heading2' | 'heading3' | 'quote' | 'bullet' | 'numbered' | 'code' | 'callout' | 'table' | 'divider';
-
-interface Block {
-  id: string;
-  type: BlockType;
-  text: string;
-}
-
-interface SlashItem {
-  /** `image` is not a block type: it uploads a file and inserts a markdown image. */
-  type: BlockType | 'image';
-  label: string;
-  hint: string;
-  marker: string;
-  /** Extra words the `/` filter matches, e.g. `h1` for Heading 1. */
-  keywords: string[];
-}
+export { parseMarkdownBlocks, serializeMarkdownBlocks };
 
 interface Props {
   value: string;
@@ -71,1130 +23,907 @@ interface Props {
   onInsertImage?: () => Promise<string | null>;
 }
 
-const SLASH_ITEMS: SlashItem[] = [
-  { type: 'paragraph', label: 'Text',         hint: 'Plain paragraph',         marker: 'T',   keywords: ['paragraph', 'plain', 'p'] },
-  { type: 'heading1',  label: 'Heading 1',    hint: 'Large section title',     marker: 'H1',  keywords: ['h1', 'title', '#'] },
-  { type: 'heading2',  label: 'Heading 2',    hint: 'Medium section title',    marker: 'H2',  keywords: ['h2', 'subtitle', '##'] },
-  { type: 'heading3',  label: 'Heading 3',    hint: 'Small section title',     marker: 'H3',  keywords: ['h3', '###'] },
-  { type: 'bullet',    label: 'Bullet list',  hint: 'Simple unordered item',   marker: '•',   keywords: ['ul', 'list', 'unordered', '-'] },
-  { type: 'numbered',  label: 'Numbered list',hint: 'Ordered item',            marker: '1.',  keywords: ['ol', 'list', 'ordered'] },
-  { type: 'quote',     label: 'Quote',        hint: 'Call out quoted text',    marker: '"',   keywords: ['blockquote', '>'] },
-  { type: 'callout',   label: 'Callout',      hint: 'Highlighted note or tip', marker: '💡',  keywords: ['note', 'tip', 'warning', 'info'] },
-  { type: 'table',     label: 'Table',        hint: 'Insert a structured table', marker: 'tbl', keywords: ['grid', 'columns'] },
-  { type: 'divider',   label: 'Divider',      hint: 'Horizontal separator line', marker: '—', keywords: ['hr', 'line', 'separator', '---'] },
-  { type: 'code',      label: 'Code',         hint: 'Always left-to-right',    marker: '</>', keywords: ['snippet', 'pre', '```'] },
-  { type: 'image',     label: 'Image',        hint: 'Upload and insert markdown image', marker: 'img', keywords: ['picture', 'photo', 'img', 'upload'] },
-];
-
-/** The filter after `/` when the whole block is a slash command (`/im`, `/heading 2`), else null. */
-function slashQuery(text: string): string | null {
-  const m = /^\/([^\s/][^\n/]{0,23})?$/.exec(text.trimEnd());
-  return m ? (m[1] ?? '') : null;
+/** Where the caret goes once the next render is on screen. */
+interface Focus {
+  id: string;
+  at?: CaretPos;
+  end?: number;
+  /** Re-check for a `/` command after focusing (the + button starts one). */
+  slash?: boolean;
 }
 
-/** Items matching the query: label prefix first, then keyword prefix, then anywhere in label or hint. */
-function filterSlashItems(items: SlashItem[], query: string): SlashItem[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return items;
-  const rank = (item: SlashItem) => {
-    const label = item.label.toLowerCase();
-    if (label.startsWith(q) || label.split(' ').some(w => w.startsWith(q))) return 0;
-    if (item.keywords.some(k => k.startsWith(q))) return 1;
-    if (label.includes(q) || item.hint.toLowerCase().includes(q)) return 2;
-    return -1;
-  };
-  return items
-    .map(item => ({ item, r: rank(item) }))
-    .filter(x => x.r >= 0)
-    .sort((a, b) => a.r - b.r)
-    .map(x => x.item);
+interface Snapshot {
+  blocks: Block[];
+  caret: Focus | null;
+}
+
+interface SlashState {
+  blockId: string;
+  /** Text offset of the `/`. */
+  start: number;
+  query: string;
+  anchor: { x: number; top: number; bottom: number };
 }
 
 /** Drag payload type; a custom type so text fields never accept the drop as pasted text. */
 const BLOCK_MIME = 'application/x-mditoor-block';
 
-/** Block types offered by the right-click "Turn into" menu (they keep the block's text). */
-const TURN_INTO: BlockType[] = ['paragraph', 'heading1', 'heading2', 'heading3', 'bullet', 'numbered', 'quote', 'callout', 'code'];
+const IMAGE_ONLY = /^!\[([^\]]*)\]\(([^)]+)\)\s*$/;
+/** A paragraph that is just one image is shown as an image block. */
+const imageOf = (b: Block) => (b.type === 'paragraph' ? IMAGE_ONLY.exec(b.text.trim()) : null);
 
-const CALLOUT_EMOJI = ['💡', '⚠️', '📝', '🔔', '✅', '❌', '💬', 'ℹ️', '🚀', '🎯', '📌', '🔥'];
+const textLength = (md: string) => plainOf(mdToRuns(md)).length;
 
-const CALLOUT_JSX_TYPES = ['info', 'warning', 'tip', 'danger', 'note', 'success', 'error'] as const;
-type CalloutJsxType = typeof CALLOUT_JSX_TYPES[number];
-
-const CALLOUT_TYPE_EMOJI: Record<CalloutJsxType, string> = {
-  info:    'ℹ️',
-  warning: '⚠️',
-  tip:     '✅',
-  danger:  '❌',
-  note:    '📝',
-  success: '✅',
-  error:   '❌',
+/** Ctrl+Shift+digit turns the block into this type (the digit row, whatever the keyboard layout). */
+const DIGIT_TYPES: Record<string, BlockType> = {
+  Digit0: 'paragraph', Digit1: 'heading1', Digit2: 'heading2', Digit3: 'heading3',
+  Digit4: 'todo', Digit5: 'bullet', Digit6: 'numbered', Digit7: 'quote', Digit8: 'code',
 };
 
-function calloutParts(text: string): { emoji: string; content: string; jsxType?: CalloutJsxType } {
-  const nl = text.indexOf('\n');
-  const rawEmoji = nl === -1 ? (text || '💡') : text.slice(0, nl);
-  const content  = nl === -1 ? '' : text.slice(nl + 1);
-  if (rawEmoji.startsWith('type:')) {
-    const jsxType = rawEmoji.slice(5) as CalloutJsxType;
-    return { emoji: CALLOUT_TYPE_EMOJI[jsxType] ?? 'ℹ️', content, jsxType };
-  }
-  return { emoji: rawEmoji || '💡', content };
-}
-
-function detectDir(text: string): 'rtl' | 'ltr' {
-  // Strong RTL code-point ranges: Arabic, Hebrew, Syriac, Thaana, NKo, Samaritan …
-  return /[֐-ࣿיִ-﷽ﹰ-﻿]/.test(text.trim().slice(0, 200))
-    ? 'rtl'
-    : 'ltr';
-}
-
-function startsWithEmoji(str: string): boolean {
-  const cp = str.codePointAt(0);
-  if (cp === undefined) return false;
-  return (cp >= 0x1F300 && cp <= 0x1FAFF) ||
-    (cp >= 0x2600  && cp <= 0x27BF) ||
-    cp === 0x2139;
-}
-
-const LANG_OPTIONS = [
-  { value: '',           label: 'Plain text'  },
-  { value: 'bash',       label: 'Bash'        },
-  { value: 'c',          label: 'C'           },
-  { value: 'cpp',        label: 'C++'         },
-  { value: 'css',        label: 'CSS'         },
-  { value: 'go',         label: 'Go'          },
-  { value: 'html',       label: 'HTML'        },
-  { value: 'java',       label: 'Java'        },
-  { value: 'javascript', label: 'JavaScript'  },
-  { value: 'json',       label: 'JSON'        },
-  { value: 'markdown',   label: 'Markdown'    },
-  { value: 'php',        label: 'PHP'         },
-  { value: 'python',     label: 'Python'      },
-  { value: 'ruby',       label: 'Ruby'        },
-  { value: 'rust',       label: 'Rust'        },
-  { value: 'shell',      label: 'Shell'       },
-  { value: 'sql',        label: 'SQL'         },
-  { value: 'swift',      label: 'Swift'       },
-  { value: 'typescript', label: 'TypeScript'  },
-  { value: 'yaml',       label: 'YAML'        },
-];
-
-function parseCodeText(text: string): { lang: string; code: string } {
-  const nl = text.indexOf('\n');
-  if (nl === -1) return { lang: '', code: text };
-  const firstLine = text.slice(0, nl);
-  // First line is a language if it's a short identifier (no spaces)
-  if (/^[a-zA-Z0-9+#._-]{0,20}$/.test(firstLine)) {
-    return { lang: firstLine, code: text.slice(nl + 1) };
-  }
-  return { lang: '', code: text };
-}
-
-function renderInline(raw: string): string {
-  const esc = (t: string) =>
-    t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const tokens: [string, string][] = [];
-  let n = 0;
-  const tok = (html: string): string => {
-    const k = `\x00${n++}\x00`;
-    tokens.push([k, html]);
-    return k;
-  };
-  let s = raw;
-  // Inline code (verbatim – escape content)
-  s = s.replace(/`([^`\n]+)`/g, (_, c) =>
-    tok(`<code class="inline-code">${esc(c)}</code>`));
-  // Images (before links)
-  s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) =>
-    tok(`<img data-src="${esc(src).replace(/"/g, '&quot;')}" alt="${esc(alt).replace(/"/g, '&quot;')}" class="inline-img" />`));
-  // Links
-  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, href) =>
-    tok(`<a href="${href}" target="_blank" rel="noopener noreferrer">${esc(text)}</a>`));
-  // Bold italic
-  s = s.replace(/\*\*\*(.+?)\*\*\*/g, (_, t) =>
-    tok(`<strong><em>${esc(t)}</em></strong>`));
-  // Bold
-  s = s.replace(/\*\*(.+?)\*\*/g, (_, t) => tok(`<strong>${esc(t)}</strong>`));
-  s = s.replace(/__(.+?)__/g, (_, t) => tok(`<strong>${esc(t)}</strong>`));
-  // Italic
-  s = s.replace(/\*([^*\n]+)\*/g, (_, t) => tok(`<em>${esc(t)}</em>`));
-  // Strikethrough
-  s = s.replace(/~~(.+?)~~/g, (_, t) => tok(`<del>${esc(t)}</del>`));
-  // Escape remaining plain text
-  s = esc(s);
-  // Restore token HTML (already safe)
-  for (const [k, html] of tokens) s = s.split(k).join(html);
-  return s;
-}
-
-/** Rendered inline markdown whose images are resolved against the workspace. */
-function InlineView({ text, fallback, onEdit, ...props }: {
-  text: string;
-  fallback: string;
-  /** Called with the caret (or selection) in raw-markdown offsets where the user clicked. */
-  onEdit?: (caret: [number, number] | null) => void;
-} & React.HTMLAttributes<HTMLDivElement>) {
-  // A trailing newline is an empty last line in the textarea; `<br>` keeps that line here too.
-  const html = usePreparedImages((renderInline(text) || fallback) + (text.endsWith('\n') ? '<br>' : ''));
-  const ref = useRef<HTMLDivElement>(null);
-  useInlineImages(ref, html);
-  return (
-    <div
-      ref={ref}
-      {...props}
-      onClick={onEdit && (e => {
-        if ((e.target as HTMLElement).closest('a, img')) return;
-        onEdit(ref.current ? clickedCaret(ref.current, text) : null);
-      })}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  );
-}
-
-/** Rendered-text offset of a DOM position inside `root`. */
-function renderedOffset(root: HTMLElement, node: Node, offset: number): number {
-  const range = document.createRange();
-  range.setStart(root, 0);
-  range.setEnd(node, offset);
-  return range.toString().length;
-}
-
 /**
- * Maps an offset in the rendered text to the raw markdown by walking both strings
- * and skipping markup characters (`**`, `[`, `](url)`, ...) that don't render.
+ * What a markdown marker typed at the start of a block turns it into (`# `, `- `, `1. `,
+ * `> `, `[] `, three backticks, `---`), and how many characters the marker takes.
+ * `before` is the text prior to this edit: a marker that was already there is left alone.
  */
-function rawOffset(raw: string, rendered: string, offset: number): number {
-  if (raw === rendered) return offset;
-  let i = 0;
-  let j = 0;
-  while (j < offset && i < raw.length) {
-    if (raw[i] === rendered[j]) j++;
-    i++;
+function blockShortcut(b: Block, before: string, plain: string, caret: number): { type: BlockType; checked?: boolean; cut: number } | null {
+  if (b.type !== 'paragraph' && b.type !== 'bullet') return null;
+  if (b.type === 'paragraph' && plain !== before) {
+    if (plain === '```') return { type: 'code', cut: 3 };
+    if (plain === '---') return { type: 'divider', cut: 3 };
   }
-  // Land after any closing markup that hugs the clicked word (`**bold**|`).
-  while (i < raw.length && /[*_~`]/.test(raw[i]) && rendered[j] !== raw[i]) i++;
-  return i;
+  const m = /^(#{1,3}|[-*+]|\d{1,9}[.)]|>|\[[ xX]?\]) /.exec(plain);
+  if (!m || caret < m[0].length || before.startsWith(m[0])) return null;
+  const mark = m[1];
+  const cut = m[0].length;
+  if (mark.startsWith('[')) return { type: 'todo', checked: /x/i.test(mark), cut };
+  if (b.type !== 'paragraph') return null;
+  if (mark.startsWith('#')) return { type: mark.length === 1 ? 'heading1' : mark.length === 2 ? 'heading2' : 'heading3', cut };
+  if (mark === '>') return { type: 'quote', cut };
+  return { type: /\d/.test(mark) ? 'numbered' : 'bullet', cut };
 }
 
-/** Where the click (or drag selection) in the rendered view falls in the raw markdown. */
-function clickedCaret(root: HTMLElement, raw: string): [number, number] | null {
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0 || !root.contains(sel.anchorNode)) return null;
-  const range = sel.getRangeAt(0);
-  const rendered = root.textContent ?? '';
-  const start = rawOffset(raw, rendered, renderedOffset(root, range.startContainer, range.startOffset));
-  const end = sel.isCollapsed ? start : rawOffset(raw, rendered, renderedOffset(root, range.endContainer, range.endOffset));
-  return [start, end];
+/** An empty block of `type` carrying `text`. */
+function blockOfType(type: BlockType, text = '', base: Partial<Block> = {}): Block {
+  const id = base.id ?? newId();
+  if (type === 'callout') return { id, type, text: `💡\n${text}` };
+  if (type === 'table') return { id, type, text: '|\n|' };
+  if (type === 'divider') return { id, type, text: '' };
+  if (type === 'code') return { id, type, text: `\n${text}` };
+  if (type === 'todo') return { id, type, text, indent: base.indent ?? 0, checked: false };
+  if (isList(type)) return { id, type, text, indent: base.indent ?? 0 };
+  return { id, type, text };
 }
 
-function parseTableText(text: string): { headers: string[]; rows: string[][] } {
-  const lines = text.split('\n');
-  const headers = lines[0]?.split('|') ?? ['', ''];
-  const colCount = headers.length;
-  const dataLines = lines.slice(1).filter(Boolean);
-  const rows = dataLines.map(l => {
-    const cells = l.split('|');
-    while (cells.length < colCount) cells.push('');
-    return cells.slice(0, colCount);
-  });
-  return { headers, rows: rows.length > 0 ? rows : [Array(colCount).fill('')] };
-}
-
-function id() {
-  return crypto.randomUUID();
-}
-
-function block(type: BlockType, text = ''): Block {
-  return { id: id(), type, text };
-}
-
-export function parseMarkdownBlocks(markdown: string): Block[] {
-  const lines = markdown.replace(/\r\n/g, '\n').split('\n');
-  const blocks: Block[] = [];
-  let paragraph: string[] = [];
-
-  const flushParagraph = () => {
-    if (paragraph.length > 0) {
-      blocks.push(block('paragraph', paragraph.join('\n')));
-      paragraph = [];
-    }
-  };
-
-  for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i];
-
-    if (line.startsWith('```')) {
-      flushParagraph();
-      const lang = line.slice(3).trim();
-      const codeLines: string[] = [];
-      i += 1;
-      while (i < lines.length && !lines[i].startsWith('```')) {
-        codeLines.push(lines[i]);
-        i += 1;
-      }
-      blocks.push(block('code', lang + '\n' + codeLines.join('\n')));
-      continue;
-    }
-
-    if (!line.trim()) {
-      flushParagraph();
-      continue;
-    }
-
-    const heading = /^(#{1,3})\s+(.*)$/.exec(line);
-    if (heading) {
-      flushParagraph();
-      const level = heading[1].length;
-      blocks.push(block(level === 1 ? 'heading1' : level === 2 ? 'heading2' : 'heading3', heading[2]));
-      continue;
-    }
-
-    const quote = /^>\s?(.*)$/.exec(line);
-    if (quote) {
-      flushParagraph();
-      const firstContent = quote[1];
-      // Detect callout: blockquote whose first word is an emoji
-      const firstWord = firstContent.split(' ')[0];
-      if (startsWithEmoji(firstWord)) {
-        const emoji = firstWord;
-        const firstLine = firstContent.slice(emoji.length).trimStart();
-        const contentLines = [firstLine];
-        while (i + 1 < lines.length) {
-          const next = /^>\s?(.*)$/.exec(lines[i + 1]);
-          if (!next) break;
-          contentLines.push(next[1]);
-          i += 1;
-        }
-        blocks.push(block('callout', emoji + '\n' + contentLines.join('\n')));
-      } else {
-        const quoteLines = [firstContent];
-        while (i + 1 < lines.length) {
-          const next = /^>\s?(.*)$/.exec(lines[i + 1]);
-          if (!next) break;
-          quoteLines.push(next[1]);
-          i += 1;
-        }
-        blocks.push(block('quote', quoteLines.join('\n')));
-      }
-      continue;
-    }
-
-    const bullet = /^[-*+]\s+(.*)$/.exec(line);
-    if (bullet) {
-      flushParagraph();
-      blocks.push(block('bullet', bullet[1]));
-      continue;
-    }
-
-    const numbered = /^\d+\.\s+(.*)$/.exec(line);
-    if (numbered) {
-      flushParagraph();
-      blocks.push(block('numbered', numbered[1]));
-      continue;
-    }
-
-    // Detect thematic breaks: ---, ***, ___
-    if (/^(\s*[-*_]){3,}\s*$/.test(line)) {
-      flushParagraph();
-      blocks.push(block('divider'));
-      continue;
-    }
-
-    // Detect JSX callout: <Callout type="…">…</Callout>
-    const jsxCalloutOpen = /^<Callout\s+type="([^"]+)"\s*>/.exec(line);
-    if (jsxCalloutOpen) {
-      flushParagraph();
-      const calloutType = jsxCalloutOpen[1];
-      const afterOpen = line.slice(jsxCalloutOpen[0].length);
-      const contentLines: string[] = [];
-      if (afterOpen.includes('</Callout>')) {
-        const inner = afterOpen.slice(0, afterOpen.indexOf('</Callout>')).trimEnd();
-        if (inner) contentLines.push(inner);
-      } else {
-        if (afterOpen) contentLines.push(afterOpen);
-        while (i + 1 < lines.length) {
-          i += 1;
-          if (lines[i].trim() === '</Callout>') break;
-          contentLines.push(lines[i]);
-        }
-      }
-      blocks.push(block('callout', `type:${calloutType}\n${contentLines.join('\n')}`));
-      continue;
-    }
-
-    // Detect markdown pipe tables
-    if (/^\|.+\|/.test(line.trim())) {
-      flushParagraph();
-      const tableLines = [line];
-      while (i + 1 < lines.length && /^\|.+\|/.test(lines[i + 1].trim())) {
-        i += 1;
-        tableLines.push(lines[i]);
-      }
-      // Skip separator rows (e.g. | --- | --- |)
-      const dataLines = tableLines.filter(l => !/^\|\s*[-: |]+\|\s*$/.test(l.trim()));
-      const parsedRows = dataLines.map(l =>
-        l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim())
-      );
-      if (parsedRows.length >= 1) {
-        blocks.push(block('table', parsedRows.map(r => r.join('|')).join('\n')));
-      }
-      continue;
-    }
-
-    paragraph.push(line);
-  }
-
-  flushParagraph();
-  return blocks.length > 0 ? blocks : [block('paragraph')];
-}
-
-function serializeBlock(b: Block, index: number) {
-  const text = b.text.trimEnd();
-  if (b.type === 'callout') {
-    const { emoji, content, jsxType } = calloutParts(text);
-    if (!content.trim()) return '';
-    if (jsxType) {
-      return `<Callout type="${jsxType}">\n${content}\n</Callout>`;
-    }
-    return content.split('\n').map((line, i) =>
-      i === 0 ? `> ${emoji} ${line}` : `> ${line}`
-    ).join('\n');
-  }
-  if (b.type === 'divider') return '---';
-  if (b.type === 'table') {
-    const dataLines = text.split('\n').filter(Boolean);
-    if (!dataLines.length) return '';
-    const allRows = dataLines.map(l => l.split('|'));
-    const colCount = Math.max(...allRows.map(r => r.length));
-    const padded = allRows.map(r => {
-      const row = [...r];
-      while (row.length < colCount) row.push('');
-      return row;
-    });
-    const headerRow = '| ' + padded[0].map(h => h || ' ').join(' | ') + ' |';
-    const separator = '| ' + Array(colCount).fill('---').join(' | ') + ' |';
-    const bodyRows = padded.slice(1).map(row => '| ' + row.map(c => c || ' ').join(' | ') + ' |');
-    return [headerRow, separator, ...bodyRows].join('\n');
-  }
-  if (!text) return '';
-  if (b.type === 'heading1') return `# ${text}`;
-  if (b.type === 'heading2') return `## ${text}`;
-  if (b.type === 'heading3') return `### ${text}`;
-  if (b.type === 'quote') return text.split('\n').map(line => `> ${line}`).join('\n');
-  if (b.type === 'bullet') return text.split('\n').map(line => `- ${line}`).join('\n');
-  if (b.type === 'numbered') return text.split('\n').map((line, i) => `${index + 1 + i}. ${line}`).join('\n');
-  if (b.type === 'code') {
-    const { lang, code } = parseCodeText(text);
-    return `\`\`\`${lang}\n${code}\n\`\`\``;
-  }
-  return text;
-}
-
-export function serializeMarkdownBlocks(blocks: Block[]) {
-  const result: string[] = [];
-  let numSeq = 0;
-
-  for (let i = 0; i < blocks.length; i++) {
-    const b = blocks[i];
-    const prev = blocks[i - 1];
-
-    // Track consecutive numbered-list sequence
-    if (b.type === 'numbered') {
-      numSeq = prev?.type === 'numbered' ? numSeq + 1 : 1;
-    } else {
-      numSeq = 0;
-    }
-
-    const text = serializeBlock(b, b.type === 'numbered' ? numSeq - 1 : i);
-    if (!text) continue;
-
-    // Adjacent same-type list items join with a single newline (no blank line)
-    const continuousWithPrev =
-      (b.type === 'bullet'   && prev?.type === 'bullet') ||
-      (b.type === 'numbered' && prev?.type === 'numbered');
-
-    result.push(continuousWithPrev ? '\n' : result.length > 0 ? '\n\n' : '');
-    result.push(text);
-  }
-
-  return result.join('');
-}
-
-function AutoTextarea({
-  value,
-  onChange,
-  onKeyDown,
-  onFocus,
-  onBlur,
-  className,
-  style,
-  placeholder,
-  dir = 'auto',
-  blockId,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  onKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement>;
-  onFocus: () => void;
-  onBlur?: () => void;
-  className?: string;
-  style?: React.CSSProperties;
-  placeholder?: string;
-  dir?: 'auto' | 'ltr';
-  blockId?: string;
-}) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-
-  // Sized to the content before paint, with no extra minimum: the view mode div has the
-  // same box, so switching between them doesn't change the block's height.
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  }, [value, style?.fontSize, style?.lineHeight]);
-
-  // Width changes (window or sidebar resize) re-wrap the text.
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    let width = el.clientWidth;
-    const ro = new ResizeObserver(() => {
-      if (el.clientWidth === width) return;
-      width = el.clientWidth;
-      el.style.height = 'auto';
-      el.style.height = `${el.scrollHeight}px`;
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  return (
-    <textarea
-      ref={ref}
-      value={value}
-      rows={1}
-      dir={dir}
-      onFocus={onFocus}
-      onBlur={onBlur}
-      onChange={e => onChange(e.target.value)}
-      onKeyDown={onKeyDown}
-      placeholder={placeholder}
-      className={className}
-      spellCheck={dir !== 'ltr'}
-      data-block-input={blockId}
-      style={{
-        width: '100%',
-        resize: 'none',
-        overflow: 'hidden',
-        background: 'transparent',
-        border: 0,
-        outline: 'none',
-        color: 'var(--text)',
-        ...style,
-      }}
-    />
-  );
-}
-
-function blockLabel(type: BlockType) {
-  return SLASH_ITEMS.find(item => item.type === type)?.label ?? 'Text';
-}
-
-function CalloutBlock({
-  text,
-  editorStyle,
-  isEditing,
-  blockId,
-  onEnterEdit,
-  onFocus,
-  onBlur,
-  onChange,
-  onInsertAfter,
-  onRemove,
-}: {
-  text: string;
-  editorStyle: React.CSSProperties;
-  isEditing: boolean;
-  blockId: string;
-  onEnterEdit: () => void;
-  onFocus: () => void;
-  onBlur: () => void;
-  onChange: (v: string) => void;
-  onInsertAfter: () => void;
-  onRemove: () => void;
-}) {
-  const { emoji, content, jsxType } = calloutParts(text);
-  const dir = detectDir(content);
-
-  const cycleEmoji = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (jsxType) {
-      const idx = CALLOUT_JSX_TYPES.indexOf(jsxType);
-      const next = CALLOUT_JSX_TYPES[(idx + 1) % CALLOUT_JSX_TYPES.length];
-      onChange(`type:${next}\n${content}`);
-    } else {
-      const idx = CALLOUT_EMOJI.indexOf(emoji);
-      const next = CALLOUT_EMOJI[(idx + 1) % CALLOUT_EMOJI.length];
-      onChange(next + '\n' + content);
-    }
-  };
-
-  if (!isEditing) {
-    return (
-      <div
-        className="callout-block"
-        dir={dir}
-        onClick={() => onEnterEdit()}
-        role="button"
-        tabIndex={0}
-        style={{ cursor: 'text' }}
-        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onEnterEdit(); } }}
-      >
-        <span className="callout-emoji-btn" style={{ pointerEvents: 'none' }}>
-          {emoji}
-          {jsxType && <span className="callout-type-badge">{jsxType}</span>}
-        </span>
-        <InlineView
-          text={content}
-          fallback="&nbsp;"
-          className="callout-text block-view"
-          dir={dir}
-          style={{ ...editorStyle, lineHeight: 1.6 }}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="callout-block" dir={dir}>
-      <button
-        type="button"
-        className="callout-emoji-btn"
-        onClick={cycleEmoji}
-        onMouseDown={e => e.preventDefault()}
-        title={jsxType ? `Type: ${jsxType} — click to change` : 'Click to change emoji'}
-        aria-label="Change callout type"
-      >
-        {emoji}
-        {jsxType && <span className="callout-type-badge">{jsxType}</span>}
-      </button>
-      <div className="callout-text">
-        <AutoTextarea
-          value={content}
-          dir="auto"
-          blockId={blockId}
-          placeholder="Add a callout…"
-          className="block-editor-input"
-          style={{ ...editorStyle, lineHeight: 1.6 }}
-          onFocus={onFocus}
-          onBlur={onBlur}
-          onChange={v => onChange(emoji + '\n' + v)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              onInsertAfter();
-            }
-            if (e.key === 'Backspace' && content === '') {
-              e.preventDefault();
-              onRemove();
-            }
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function CodeBlock({
-  text,
-  onFocus,
-  onChange,
-  onInsertAfter,
-  onRemove,
-}: {
-  text: string;
-  onFocus: () => void;
-  onChange: (v: string) => void;
-  onInsertAfter: () => void;
-  onRemove: () => void;
-}) {
-  const { lang, code } = parseCodeText(text);
-  const [copied, setCopied] = useState(false);
-  const taRef = useRef<HTMLTextAreaElement>(null);
-
-  const highlighted = useMemo(() => {
-    if (!code) return '';
-    if (lang && hljs.getLanguage(lang)) {
-      try { return hljs.highlight(code, { language: lang }).value; } catch { /* fallback */ }
-    }
-    return hljs.highlightAuto(code).value;
-  }, [lang, code]);
-
-  const update = (nextLang: string, nextCode: string) =>
-    onChange(nextLang + '\n' + nextCode);
-
-  const copy = () => {
-    navigator.clipboard.writeText(code).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Escape') { onInsertAfter(); return; }
-    if (e.key === 'Backspace' && code === '') { e.preventDefault(); onRemove(); return; }
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const ta = e.currentTarget;
-      const start = ta.selectionStart;
-      const end = ta.selectionEnd;
-      const next = code.slice(0, start) + '  ' + code.slice(end);
-      update(lang, next);
-      requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = start + 2; });
-    }
-  };
-
-  const monoStyle: React.CSSProperties = {
-    fontFamily: "ui-monospace, 'Cascadia Code', 'SFMono-Regular', Consolas, monospace",
-    fontSize: 13,
-    lineHeight: 1.65,
-  };
-
-  return (
-    <div className="code-block-wrapper">
-      <div className="code-block-header">
-        <CustomSelect
-          value={lang}
-          options={LANG_OPTIONS}
-          onChange={v => update(v, code)}
-          variant="code"
-          size="sm"
-          menuMinWidth={170}
-          ariaLabel="Language"
-        />
-        <button
-          type="button"
-          className="code-copy-btn"
-          onClick={copy}
-          tabIndex={-1}
-        >
-          {copied ? '✓ Copied' : 'Copy'}
-        </button>
-      </div>
-      <div className="code-block-body">
-        <pre
-          className="code-highlight hljs"
-          aria-hidden="true"
-          style={monoStyle}
-          dangerouslySetInnerHTML={{ __html: highlighted + '\n' }}
-        />
-        <textarea
-          ref={taRef}
-          value={code}
-          onChange={e => update(lang, e.target.value)}
-          onFocus={onFocus}
-          onKeyDown={handleKeyDown}
-          className="code-block-textarea"
-          spellCheck={false}
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="off"
-          style={monoStyle}
-          placeholder="// code here…"
-        />
-      </div>
-    </div>
-  );
-}
-
-function TableBlock({
-  text,
-  editorStyle,
-  isEditing,
-  onEnterEdit,
-  onBlur,
-  onChange,
-  onInsertAfter,
-  onRemove,
-}: {
-  text: string;
-  editorStyle: React.CSSProperties;
-  isEditing: boolean;
-  onEnterEdit: () => void;
-  onBlur: () => void;
-  onChange: (v: string) => void;
-  onInsertAfter: () => void;
-  onRemove: () => void;
-}) {
-  const { headers, rows } = parseTableText(text);
-  const tid = useRef(`t${crypto.randomUUID().slice(0, 8)}`).current;
-
-  useEffect(() => {
-    if (!isEditing) return;
-    window.setTimeout(() => {
-      document.querySelector<HTMLInputElement>(`[data-tcell="${tid}-h-0"]`)?.focus();
-    }, 0);
-  }, [isEditing, tid]);
-
-  const ser = (h: string[], r: string[][]) =>
-    [h, ...r].map(row => row.join('|')).join('\n');
-
-  const setCell = (isHeader: boolean, rowIdx: number, colIdx: number, value: string) => {
-    if (isHeader) {
-      const nh = [...headers]; nh[colIdx] = value;
-      onChange(ser(nh, rows));
-    } else {
-      const nr = rows.map(r => [...r]); nr[rowIdx][colIdx] = value;
-      onChange(ser(headers, nr));
-    }
-  };
-
-  const focusCell = (rowIdx: number, colIdx: number) => {
-    const key = rowIdx === -1 ? `${tid}-h-${colIdx}` : `${tid}-${rowIdx}-${colIdx}`;
-    document.querySelector<HTMLInputElement>(`[data-tcell="${key}"]`)?.focus();
-  };
-
-  const addRow = () => {
-    const newRows = [...rows, Array(headers.length).fill('')];
-    onChange(ser(headers, newRows));
-    const newIdx = rows.length;
-    requestAnimationFrame(() => focusCell(newIdx, 0));
-  };
-
-  const addCol = () => {
-    const nh = [...headers, ''];
-    const nr = rows.map(r => [...r, '']);
-    onChange(ser(nh, nr));
-    requestAnimationFrame(() => focusCell(-1, headers.length));
-  };
-
-  const deleteRow = (rowIdx: number) => {
-    if (rows.length <= 1) { onRemove(); return; }
-    const nr = rows.filter((_, i) => i !== rowIdx);
-    onChange(ser(headers, nr));
-    requestAnimationFrame(() => focusCell(Math.max(0, rowIdx - 1), 0));
-  };
-
-  const handleKeyDown = (
-    e: React.KeyboardEvent<HTMLInputElement>,
-    rowIdx: number,
-    colIdx: number
-  ) => {
-    const colCount = headers.length;
-    const rowCount = rows.length;
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      if (!e.shiftKey) {
-        if (colIdx < colCount - 1) focusCell(rowIdx, colIdx + 1);
-        else if (rowIdx === -1) rowCount > 0 ? focusCell(0, 0) : addRow();
-        else if (rowIdx < rowCount - 1) focusCell(rowIdx + 1, 0);
-        else addRow();
-      } else {
-        if (colIdx > 0) focusCell(rowIdx, colIdx - 1);
-        else if (rowIdx === 0) focusCell(-1, colCount - 1);
-        else if (rowIdx > 0) focusCell(rowIdx - 1, colCount - 1);
-      }
-    }
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (rowIdx === -1) { rowCount > 0 ? focusCell(0, colIdx) : addRow(); }
-      else if (rowIdx < rowCount - 1) { focusCell(rowIdx + 1, colIdx); }
-      else addRow();
-    }
-    if (e.key === 'Escape') onInsertAfter();
-  };
-
-  const inputStyle: React.CSSProperties = {
-    fontSize: (editorStyle.fontSize as number) ?? 14,
-    fontFamily: editorStyle.fontFamily ?? 'inherit',
-  };
-
-  if (!isEditing) {
-    return (
-      <div
-        className="table-block-wrapper"
-        onClick={onEnterEdit}
-        role="button"
-        tabIndex={0}
-        style={{ cursor: 'text' }}
-        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onEnterEdit(); } }}
-      >
-        <div className="table-block-scroll">
-          <table className="table-block">
-            <thead>
-              <tr>
-                {headers.map((h, colIdx) => (
-                  <th key={colIdx}>
-                    <InlineView text={h} fallback="&nbsp;" className="table-cell-view" />
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, rowIdx) => (
-                <tr key={rowIdx} className="table-data-row">
-                  {row.map((cell, colIdx) => (
-                    <td key={colIdx}>
-                      <InlineView text={cell} fallback="&nbsp;" className="table-cell-view" />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="table-block-wrapper"
-      onBlur={e => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node)) onBlur();
-      }}
-    >
-      <div className="table-block-scroll">
-        <table className="table-block">
-          <thead>
-            <tr>
-              {headers.map((h, colIdx) => (
-                <th key={colIdx}>
-                  <input
-                    data-tcell={`${tid}-h-${colIdx}`}
-                    value={h}
-                    onChange={e => setCell(true, -1, colIdx, e.target.value)}
-                    onKeyDown={e => handleKeyDown(e, -1, colIdx)}
-                    placeholder="Header"
-                    className="table-cell-input"
-                    style={inputStyle}
-                  />
-                </th>
-              ))}
-              <th className="table-add-col-th">
-                <button
-                  type="button"
-                  className="table-add-btn"
-                  onClick={addCol}
-                  tabIndex={-1}
-                  title="Add column"
-                  aria-label="Add column"
-                >+</button>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, rowIdx) => (
-              <tr key={rowIdx} className="table-data-row">
-                {row.map((cell, colIdx) => (
-                  <td key={colIdx}>
-                    <input
-                      data-tcell={`${tid}-${rowIdx}-${colIdx}`}
-                      value={cell}
-                      onChange={e => setCell(false, rowIdx, colIdx, e.target.value)}
-                      onKeyDown={e => handleKeyDown(e, rowIdx, colIdx)}
-                      placeholder=""
-                      className="table-cell-input"
-                      style={inputStyle}
-                    />
-                  </td>
-                ))}
-                <td className="table-row-actions">
-                  <button
-                    type="button"
-                    className="table-row-delete-btn"
-                    onClick={() => deleteRow(rowIdx)}
-                    tabIndex={-1}
-                    title="Delete row"
-                    aria-label="Delete row"
-                  >×</button>
-                </td>
-              </tr>
-            ))}
-            <tr>
-              <td colSpan={headers.length + 1} className="table-add-row-cell">
-                <button
-                  type="button"
-                  className="table-add-row-btn"
-                  onClick={addRow}
-                  tabIndex={-1}
-                >+ Add row</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
+const BULLETS = ['•', '◦', '▪'];
 
 export function BlockEditor({ value, onChange, editorStyle, onInsertImage }: Props) {
-  const [blocks, setBlocks] = useState<Block[]>(() => parseMarkdownBlocks(value));
-  const [slashFor, setSlashFor] = useState<string | null>(null);
-  const [slashIndex, setSlashIndex] = useState(0);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  // Gap the dragged block would land in: 0 = before the first block, blocks.length = after the last.
-  const [dropSlot, setDropSlot] = useState<number | null>(null);
-  // Briefly highlights a block after it was dropped so the eye can follow it.
-  const [justDropped, setJustDropped] = useState<string | null>(null);
+  const { t, i18n } = useTranslation();
+  const uiDir: Dir = i18n.dir() === 'rtl' ? 'rtl' : 'ltr';
+
+  const [blocks, setBlocksState] = useState<Block[]>(() => parseMarkdownBlocks(value));
+  const blocksRef = useRef(blocks);
+  const lastEmitted = useRef(value);
   const rootRef = useRef<HTMLDivElement>(null);
-  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const handles = useRef(new Map<string, EditableHandle>());
+  const focusedRef = useRef<string | null>(null);
+  const pending = useRef<Focus | null>(null);
+  const history = useRef<{ undo: Snapshot[]; redo: Snapshot[]; last: { key: string; at: number } | null }>({ undo: [], redo: [], last: null });
+
+  // Whole blocks selected (Esc, Shift+arrows past a block's edge, or dragging across blocks).
+  const [selected, setSelected] = useState<{ anchor: string; focus: string } | null>(null);
+  const [slash, setSlash] = useState<SlashState | null>(null);
+  const [slashIndex, setSlashIndex] = useState(0);
+  const slashRef = useRef<SlashState | null>(null);
+  slashRef.current = slash;
+  // A `/` the user closed with Esc stays closed until they type another one.
+  const slashDismissed = useRef<{ blockId: string; start: number } | null>(null);
+  const [menu, setMenu] = useState<{ blockId: string; x: number; y: number } | null>(null);
+  const [format, setFormat] = useState<(FormatState & { blockId: string }) | null>(null);
+  const [link, setLink] = useState<{ blockId: string; start: number; end: number; value: string } | null>(null);
+  const linkRef = useRef(link);
+  linkRef.current = link;
+  // Right-click menu for text; keeps the selection it was opened on.
+  const [textMenu, setTextMenu] = useState<{
+    blockId: string; x: number; y: number; start: number; end: number; marks: Marks; canLink: boolean;
+  } | null>(null);
+  const textMenuRef = useRef(textMenu);
+  textMenuRef.current = textMenu;
+  // The next paste goes in as plain text (Ctrl+Shift+V, or "Paste as plain text").
+  const plainPaste = useRef(false);
+  const [editingTable, setEditingTable] = useState<string | null>(null);
+  // An image block being edited as markdown.
+  const [rawImage, setRawImage] = useState<string | null>(null);
+
+  const [draggingIds, setDraggingIds] = useState<string[] | null>(null);
+  // Gap the dragged blocks would land in: 0 = before the first block, blocks.length = after the last.
+  const [dropSlot, setDropSlot] = useState<number | null>(null);
+  // Briefly highlights blocks after they were dropped so the eye can follow them.
+  const [justDropped, setJustDropped] = useState<string[] | null>(null);
+
+  const images = useEditorImages();
+
+  const all = () => blocksRef.current;
+  const indexOf = (id: string) => all().findIndex(b => b.id === id);
+  const replaceAt = (idx: number, ...repl: Block[]) => [...all().slice(0, idx), ...repl, ...all().slice(idx + 1)];
+
+  /* ─── State, history, focus ─────────────────────────────────────────── */
+
+  const currentCaret = (): Focus | null => {
+    const id = focusedRef.current;
+    if (!id) return null;
+    const sel = handles.current.get(id)?.selection();
+    return sel ? { id, at: sel.start, end: sel.end } : { id };
+  };
+
+  const apply = (next: Block[], focus?: Focus) => {
+    blocksRef.current = next;
+    setBlocksState(next);
+    const markdown = serializeMarkdownBlocks(next);
+    lastEmitted.current = markdown;
+    onChange(markdown);
+    if (focus) pending.current = focus;
+  };
+
+  /** Applies an edit as one undo step; consecutive typing in one block is a single step. */
+  const commit = (next: Block[], opts: { focus?: Focus; typing?: string } = {}) => {
+    const h = history.current;
+    const now = Date.now();
+    const sameBurst = !!opts.typing && h.last?.key === opts.typing && now - h.last.at < 1000;
+    if (!sameBurst) {
+      h.undo.push({ blocks: all(), caret: currentCaret() });
+      if (h.undo.length > 300) h.undo.shift();
+    }
+    h.redo = [];
+    h.last = opts.typing ? { key: opts.typing, at: now } : null;
+    apply(normalizeIndents(next.length ? next : [block('paragraph')]), opts.focus);
+  };
+
+  const travel = (from: Snapshot[], to: Snapshot[]) => {
+    const snap = from.pop();
+    if (!snap) return;
+    to.push({ blocks: all(), caret: currentCaret() });
+    history.current.last = null;
+    setSelected(null);
+    setSlash(null);
+    apply(snap.blocks, snap.caret ?? undefined);
+  };
+  const undo = () => travel(history.current.undo, history.current.redo);
+  const redo = () => travel(history.current.redo, history.current.undo);
+
+  const focusNow = (f: Focus) => {
+    const h = handles.current.get(f.id);
+    if (h) {
+      h.focus(f.at ?? 'end', f.end);
+      if (f.slash) refreshSlash(f.id);
+      return;
+    }
+    const el = rootRef.current?.querySelector<HTMLElement>(`[data-block-input="${f.id}"]`);
+    if (!el) return;
+    el.focus();
+    if (el instanceof HTMLTextAreaElement) {
+      const at = f.at === 'start' || f.at === 0 ? 0 : el.value.length;
+      el.setSelectionRange(at, at);
+    }
+  };
+
+  // Runs after the blocks' own layout effects, so new text is already on screen.
+  useLayoutEffect(() => {
+    const f = pending.current;
+    if (!f) return;
+    pending.current = null;
+    focusNow(f);
+  });
+
+  // The post changed from outside (another post, the markdown view, a sync).
+  useEffect(() => {
+    if (value === lastEmitted.current) return;
+    lastEmitted.current = value;
+    const next = parseMarkdownBlocks(value);
+    blocksRef.current = next;
+    setBlocksState(next);
+    history.current = { undo: [], redo: [], last: null };
+    setSelected(null);
+    setSlash(null);
+  }, [value]);
 
   useEffect(() => {
     if (!justDropped) return;
     const id = window.setTimeout(() => setJustDropped(null), 700);
     return () => window.clearTimeout(id);
   }, [justDropped]);
-  const lastEmitted = useRef(value);
 
-  useEffect(() => {
-    if (value === lastEmitted.current) return;
-    setBlocks(parseMarkdownBlocks(value));
-  }, [value]);
+  /* ─── Block operations ──────────────────────────────────────────────── */
 
-  useEffect(() => {
-    if (slashFor === null) return;
-    document.querySelector<HTMLElement>(`[data-slash-idx="${slashIndex}"]`)
-      ?.scrollIntoView({ block: 'nearest' });
-  }, [slashIndex, slashFor]);
-
-  const emit = (next: Block[]) => {
-    setBlocks(next);
-    const markdown = serializeMarkdownBlocks(next);
-    lastEmitted.current = markdown;
-    onChange(markdown);
+  const updateBlock = (id: string, patch: Partial<Block>, typing = true) => {
+    const idx = indexOf(id);
+    if (idx === -1) return;
+    commit(replaceAt(idx, { ...all()[idx], ...patch }), typing ? { typing: id } : {});
   };
 
-  const updateBlock = (blockId: string, updates: Partial<Block>) => {
-    const next = blocks.map(b => b.id === blockId ? { ...b, ...updates } : b);
-    emit(next);
+  const insertAfter = (id: string, nb: Block = block('paragraph'), focus: Focus = { id: nb.id, at: 'start' }) => {
+    const idx = indexOf(id);
+    commit([...all().slice(0, idx + 1), nb, ...all().slice(idx + 1)], { focus });
   };
 
-  const images = useEditorImages();
-  // Image blocks open the viewer; without the images context they fall back to editing.
-  const openImage = (blockId: string, alt: string, src: string, edit: () => void) => {
-    if (!images) { edit(); return; }
-    images.openViewer({
-      src,
-      alt,
-      onEdit: edit,
-      onReplaceSrc: next => updateBlock(blockId, { text: `![${alt}](${next})` }),
+  const removeBlocks = (ids: string[]) => {
+    const first = indexOf(ids[0]);
+    const next = all().filter(b => !ids.includes(b.id));
+    if (next.length === 0) {
+      const nb = block('paragraph');
+      commit([nb], { focus: { id: nb.id } });
+      return;
+    }
+    const before = all()[first - 1];
+    commit(next, { focus: before ? { id: before.id, at: 'end' } : { id: next[0].id, at: 'start' } });
+  };
+
+  /** Keeps the block's text; callouts and code carry theirs over. */
+  const convertBlock = (id: string, type: BlockType) => {
+    const idx = indexOf(id);
+    if (idx === -1) return;
+    const current = all()[idx];
+    if (current.type === type) { focusNow({ id }); return; }
+    const existing = current.type === 'code' ? parseCodeText(current.text).code
+      : current.type === 'table' || current.type === 'divider' ? ''
+      : textOf(current);
+    const nb = blockOfType(type, existing, { id, indent: current.indent });
+    if (type === 'divider' && !all()[idx + 1]) {
+      const para = block('paragraph');
+      commit(replaceAt(idx, nb, para), { focus: { id: para.id } });
+      return;
+    }
+    if (type === 'table') setEditingTable(id);
+    commit(replaceAt(idx, nb), { focus: { id, at: 'end' } });
+  };
+
+  const duplicate = (ids: string[], reselect: boolean) => {
+    const group = all().filter(b => ids.includes(b.id));
+    if (!group.length) return;
+    const copies = group.map(b => ({ ...b, id: newId() }));
+    const last = indexOf(group[group.length - 1].id);
+    commit([...all().slice(0, last + 1), ...copies, ...all().slice(last + 1)],
+      reselect ? {} : { focus: { id: copies[copies.length - 1].id, at: 'end' } });
+    if (reselect) setSelected({ anchor: copies[0].id, focus: copies[copies.length - 1].id });
+  };
+
+  /** Moves blocks so they land at `slot` (an index between blocks, 0..length). */
+  const moveTo = (ids: string[], slot: number, focus?: Focus) => {
+    const moving = all().filter(b => ids.includes(b.id));
+    const without = all().filter(b => !ids.includes(b.id));
+    const at = slot - all().slice(0, slot).filter(b => ids.includes(b.id)).length;
+    const next = [...without.slice(0, at), ...moving, ...without.slice(at)];
+    if (next.every((b, i) => b === all()[i])) return false;
+    commit(next, { focus });
+    return true;
+  };
+
+  /** Moves a run of neighbouring blocks one place up or down. */
+  const nudge = (ids: string[], delta: -1 | 1, focus?: Focus) => {
+    const lo = indexOf(ids[0]);
+    const hi = indexOf(ids[ids.length - 1]);
+    if (delta < 0 ? lo === 0 : hi === all().length - 1) return;
+    moveTo(ids, delta < 0 ? lo - 1 : hi + 2, focus);
+  };
+
+  const indentBy = (ids: string[], delta: -1 | 1, focus?: Focus) => {
+    const next = all().map(b => (ids.includes(b.id) && isList(b.type) ? { ...b, indent: Math.max(0, (b.indent ?? 0) + delta) } : b));
+    commit(next, { focus });
+  };
+
+  const copyBlocks = (ids: string[]) => {
+    const md = serializeMarkdownBlocks(all().filter(b => ids.includes(b.id)));
+    navigator.clipboard.writeText(md).catch(() => {});
+  };
+
+  /* ─── Block selection ───────────────────────────────────────────────── */
+
+  const selectRange = (anchor: string, focus: string) => {
+    setSelected({ anchor, focus });
+    setSlash(null);
+    setFormat(null);
+    window.getSelection()?.removeAllRanges();
+    rootRef.current?.focus({ preventScroll: true });
+    rootRef.current?.querySelector(`[data-block-row="${focus}"]`)?.scrollIntoView({ block: 'nearest' });
+  };
+
+  const selRange = (() => {
+    if (!selected) return null;
+    const a = blocks.findIndex(b => b.id === selected.anchor);
+    const f = blocks.findIndex(b => b.id === selected.focus);
+    return a === -1 || f === -1 ? null : { lo: Math.min(a, f), hi: Math.max(a, f), focus: f };
+  })();
+  const selectedIds = selRange ? blocks.slice(selRange.lo, selRange.hi + 1).map(b => b.id) : [];
+
+  /* ─── Slash commands ────────────────────────────────────────────────── */
+
+  const slashItems = useMemo(() => SLASH_ITEMS.filter(item => item.type !== 'image' || onInsertImage), [onInsertImage]);
+  const slashMatches = slash ? filterSlashItems(slashItems, slash.query, t) : [];
+
+  /** Opens, updates or closes the `/` menu from the text before the caret. */
+  function refreshSlash(id: string) {
+    const h = handles.current.get(id);
+    const sel = h?.selection();
+    if (!h || !sel || sel.start !== sel.end) { setSlash(null); return; }
+    const m = /(?:^|\s)\/([^/\n]{0,30})$/.exec(h.plain().slice(0, sel.start));
+    if (!m || m[1].startsWith(' ')) { slashDismissed.current = null; setSlash(null); return; }
+    const query = m[1];
+    const start = sel.start - query.length - 1;
+    const dismissed = slashDismissed.current;
+    if (dismissed && dismissed.blockId === id && dismissed.start === start) { setSlash(null); return; }
+    // Nothing matches and the text went on: it was a plain slash, not a command.
+    if (!filterSlashItems(slashItems, query, t).length && (query.includes(' ') || query.length > 10)) { setSlash(null); return; }
+    const prev = slashRef.current;
+    if (prev && prev.blockId === id && prev.start === start) {
+      if (prev.query !== query) { setSlash({ ...prev, query }); setSlashIndex(0); }
+      return;
+    }
+    const r = h.caretRect();
+    const box = h.el.getBoundingClientRect();
+    const anchor = r
+      ? { x: r.left, top: r.top, bottom: r.bottom }
+      : { x: getComputedStyle(h.el).direction === 'rtl' ? box.right : box.left, top: box.top, bottom: box.bottom };
+    setSlash({ blockId: id, start, query, anchor });
+    setSlashIndex(0);
+  }
+
+  const runSlashItem = async (item: SlashItem) => {
+    const state = slashRef.current;
+    if (!state) return;
+    const h = handles.current.get(state.blockId);
+    const idx = indexOf(state.blockId);
+    setSlash(null);
+    if (!h || idx === -1) return;
+    const b = all()[idx];
+    // Take the `/command` back out of the text.
+    const rest = replaceRange(h.runs(), state.start, h.selection()?.end ?? state.start, []);
+    const restMd = runsToMd(rest);
+    const empty = plainOf(rest).trim() === '';
+    const cleaned = withText(b, restMd);
+
+    if (item.type === 'image') {
+      commit(replaceAt(idx, cleaned), { focus: { id: b.id, at: state.start } });
+      const url = await onInsertImage?.();
+      if (!url) return;
+      const name = url.split('/').pop()?.replace(/\.[^.]+$/, '') ?? 'image';
+      const img = block('paragraph', `![${name}](${url})`);
+      const at = indexOf(b.id);
+      if (at === -1) return;
+      const after = block('paragraph');
+      const tail = all()[at + 1] ? [] : [after];
+      const focus = { id: tail.length ? after.id : all()[at + 1].id, at: 'start' as const };
+      commit(empty && b.type === 'paragraph' ? replaceAt(at, img, ...tail) : replaceAt(at, all()[at], img, ...tail), { focus });
+      return;
+    }
+
+    // An empty block becomes the chosen type; otherwise the new block goes below the text.
+    if (empty) {
+      commit(replaceAt(idx, cleaned));
+      convertBlock(b.id, item.type);
+      return;
+    }
+    const nb = blockOfType(item.type);
+    if (item.type === 'table') setEditingTable(nb.id);
+    const extra = item.type === 'divider' && !all()[idx + 1] ? [block('paragraph')] : [];
+    commit(replaceAt(idx, cleaned, nb, ...extra), { focus: { id: extra[0]?.id ?? nb.id, at: 'start' } });
+  };
+
+  /* ─── Text editing ──────────────────────────────────────────────────── */
+
+  const onTextChange = (id: string, md: string, info: ChangeInfo) => {
+    const idx = indexOf(id);
+    if (idx === -1) return;
+    const b = all()[idx];
+    const h = handles.current.get(id);
+    const next = withText(b, md);
+    commit(replaceAt(idx, next), { typing: id });
+
+    const inserted = !!info.inputType?.startsWith('insert') && info.inputType !== 'insertFromPaste';
+    const shortcut = h && inserted && info.caret !== null ? blockShortcut(b, plainOf(mdToRuns(textOf(b))), info.plain, info.caret) : null;
+    if (h && shortcut && info.caret !== null) {
+      // A separate undo step: Ctrl+Z gives back the characters that were typed.
+      history.current.last = null;
+      const rest = h.splitAt(shortcut.cut, shortcut.cut)[1];
+      const at = info.caret - shortcut.cut;
+      setSlash(null);
+      if (shortcut.type === 'divider') {
+        const para = block('paragraph', rest);
+        commit(replaceAt(idx, { id, type: 'divider', text: '' }, para), { focus: { id: para.id, at: 'start' } });
+      } else if (shortcut.type === 'code') {
+        commit(replaceAt(idx, blockOfType('code', rest, { id })), { focus: { id } });
+      } else {
+        commit(replaceAt(idx, { ...blockOfType(shortcut.type, rest, { id, indent: b.indent }), ...(shortcut.checked ? { checked: true } : {}) }),
+          { focus: { id, at } });
+      }
+      return;
+    }
+    // Typing a lone image turns the paragraph into an image block; keep the keyboard on it.
+    if (imageOf(next)) { pending.current = { id }; return; }
+    refreshSlash(id);
+  };
+
+  const enter = (b: Block, h: EditableHandle) => {
+    const idx = indexOf(b.id);
+    const plain = h.plain();
+    const sel = h.selection() ?? { start: plain.length, end: plain.length };
+    const list = isList(b.type);
+    if (plain === '') {
+      // Enter on an empty item steps out: one level up, then back to plain text.
+      if (list && (b.indent ?? 0) > 0) commit(replaceAt(idx, { ...b, indent: (b.indent ?? 0) - 1 }), { focus: { id: b.id, at: 0 } });
+      else if (b.type !== 'paragraph') commit(replaceAt(idx, block('paragraph', '', { id: b.id })), { focus: { id: b.id, at: 0 } });
+      else insertAfter(b.id);
+      return;
+    }
+    const sibling = (text: string) => (list ? blockOfType(b.type, text, { indent: b.indent }) : block('paragraph', text));
+    if (sel.start === 0 && sel.end === 0) {
+      // At the very start the block moves down and an empty line opens above it.
+      commit([...all().slice(0, idx), sibling(''), ...all().slice(idx)], { focus: { id: b.id, at: 0 } });
+      return;
+    }
+    const [left, right] = h.splitAt(sel.start, sel.end);
+    const nb = sibling(right);
+    commit(replaceAt(idx, withText(b, left), nb), { focus: { id: nb.id, at: 0 } });
+  };
+
+  const backspaceAtStart = (b: Block) => {
+    const idx = indexOf(b.id);
+    if (isList(b.type) && (b.indent ?? 0) > 0) {
+      commit(replaceAt(idx, { ...b, indent: (b.indent ?? 0) - 1 }), { focus: { id: b.id, at: 0 } });
+      return;
+    }
+    if (b.type !== 'paragraph') {
+      commit(replaceAt(idx, block('paragraph', textOf(b), { id: b.id })), { focus: { id: b.id, at: 0 } });
+      return;
+    }
+    const prev = all()[idx - 1];
+    if (!prev) return;
+    const without = all().filter(x => x.id !== prev.id);
+    if (prev.type === 'divider' || imageOf(prev)) {
+      commit(without, { focus: { id: b.id, at: 0 } });
+    } else if (isText(prev.type)) {
+      const at = textLength(textOf(prev));
+      commit(all().filter(x => x.id !== b.id).map(x => (x.id === prev.id ? withText(prev, textOf(prev) + b.text) : x)), { focus: { id: prev.id, at } });
+    } else if (b.text === '') {
+      commit(all().filter(x => x.id !== b.id), { focus: { id: prev.id, at: 'end' } });
+    } else {
+      focusNow({ id: prev.id, at: 'end' });
+    }
+  };
+
+  const deleteAtEnd = (b: Block, at: number) => {
+    const idx = indexOf(b.id);
+    const next = all()[idx + 1];
+    if (!next) return;
+    const without = all().filter(x => x.id !== next.id);
+    if (next.type === 'divider' || imageOf(next)) commit(without, { focus: { id: b.id, at } });
+    else if (isText(next.type)) commit(without.map(x => (x.id === b.id ? withText(b, textOf(b) + textOf(next)) : x)), { focus: { id: b.id, at } });
+  };
+
+  /** Moves the caret into a neighbouring block, keeping its horizontal position. */
+  const moveInto = (target: Block, line: 'first' | 'last', x: number) => {
+    const h = handles.current.get(target.id);
+    if (h) h.focusAtX(x, line);
+    else focusNow({ id: target.id, at: line === 'first' ? 'start' : 'end' });
+  };
+
+  const stepFrom = (id: string, delta: -1 | 1) => {
+    const target = all()[indexOf(id) + delta];
+    if (target) focusNow({ id: target.id, at: delta < 0 ? 'end' : 'start' });
+  };
+
+  const openLinkEditor = (id: string) => {
+    const h = handles.current.get(id);
+    const sel = h?.selection();
+    if (!h || !sel) return;
+    const range = sel.start === sel.end ? h.linkAt(sel.start) : { start: sel.start, end: sel.end, dest: h.activeMarks().a ?? '' };
+    if (!range) return;
+    if (!format) {
+      const r = h.caretRect() ?? h.el.getBoundingClientRect();
+      setFormat({ blockId: id, rect: { left: r.left, right: r.right, top: r.top, bottom: r.bottom }, marks: h.activeMarks() });
+    }
+    setLink({ blockId: id, start: range.start, end: range.end, value: hrefOf(range.dest) });
+  };
+
+  const onTextKey = (id: string, e: React.KeyboardEvent<HTMLDivElement>, h: EditableHandle) => {
+    if (e.nativeEvent.isComposing) return;
+    const idx = indexOf(id);
+    if (idx === -1) return;
+    const b = all()[idx];
+    const mod = (e.ctrlKey || e.metaKey) && !e.altKey;
+    const stop = () => e.preventDefault();
+
+    if (slash && slash.blockId === id) {
+      if (e.key === 'Escape') {
+        stop();
+        setSlash(null);
+        // A lone slash (the + button's, or one typed into an empty line) goes away with its
+        // menu; inside text it stays as a plain character and the menu keeps quiet about it.
+        if (h.plain() === '/') { slashDismissed.current = null; updateBlock(id, { text: '' }); }
+        else slashDismissed.current = { blockId: id, start: slash.start };
+        return;
+      }
+      if (slashMatches.length > 0) {
+        if (e.key === 'ArrowDown') { stop(); setSlashIndex(i => (i + 1) % slashMatches.length); return; }
+        if (e.key === 'ArrowUp') { stop(); setSlashIndex(i => (i - 1 + slashMatches.length) % slashMatches.length); return; }
+        if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+          stop();
+          void runSlashItem(slashMatches[Math.min(slashIndex, slashMatches.length - 1)]);
+          return;
+        }
+      }
+    }
+
+    if (e.key === 'Escape') { stop(); selectRange(id, id); return; }
+
+    if (e.key === 'Backspace') {
+      const sel = h.selection();
+      if (sel && sel.start === 0 && sel.end === 0) { stop(); backspaceAtStart(b); }
+      return;
+    }
+    if (e.key === 'Delete') {
+      const sel = h.selection();
+      const len = h.plain().length;
+      if (sel && sel.start === len && sel.end === len) { stop(); deleteAtEnd(b, len); }
+      return;
+    }
+
+    if (mod) {
+      // Physical keys (`code`), so shortcuts keep working on an Arabic keyboard layout.
+      const c = e.code;
+      const mark = (key: MarkKey) => { stop(); h.toggleMark(key); };
+      if (c === 'KeyZ') { stop(); if (e.shiftKey) redo(); else undo(); }
+      else if (c === 'KeyY') { stop(); redo(); }
+      else if (c === 'KeyB' && !e.shiftKey) mark('b');
+      else if (c === 'KeyI' && !e.shiftKey) mark('i');
+      else if (c === 'KeyE' && !e.shiftKey) mark('c');
+      else if ((c === 'KeyS' || c === 'KeyX') && e.shiftKey) mark('s');
+      else if (c === 'KeyK' && !e.shiftKey) {
+        // With text selected (or the caret in a link) Ctrl+K edits the link; otherwise it is
+        // left for the app's command palette.
+        const sel = h.selection();
+        if (sel && (sel.start !== sel.end || h.linkAt(sel.start))) { stop(); e.stopPropagation(); openLinkEditor(id); }
+      }
+      else if (c === 'KeyV' && e.shiftKey) {
+        // The webview still fires the paste; this only marks it as plain text.
+        plainPaste.current = true;
+        window.setTimeout(() => { plainPaste.current = false; }, 200);
+      }
+      else if (c === 'KeyD' && !e.shiftKey) { stop(); duplicate([id], false); }
+      else if (c === 'KeyA' && !e.shiftKey) {
+        // The first Ctrl+A selects the block's text; the next one selects every block.
+        const sel = h.selection();
+        const len = h.plain().length;
+        if (!sel || len === 0 || (sel.start === 0 && sel.end === len)) { stop(); selectRange(all()[0].id, all()[all().length - 1].id); }
+      }
+      else if (e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        stop();
+        const sel = h.selection();
+        nudge([id], e.key === 'ArrowUp' ? -1 : 1, { id, at: sel?.start, end: sel?.end });
+      }
+      else if (e.key === 'Enter') { stop(); if (b.type === 'todo') updateBlock(id, { checked: !b.checked }, false); }
+      else if (e.shiftKey && DIGIT_TYPES[c]) { stop(); convertBlock(id, DIGIT_TYPES[c]); }
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      stop();
+      if (e.shiftKey) h.insert([{ text: '\n' }]);
+      else enter(b, h);
+      return;
+    }
+
+    if (e.key === 'Tab') {
+      stop();
+      if (isList(b.type)) {
+        const sel = h.selection();
+        indentBy([id], e.shiftKey ? -1 : 1, { id, at: sel?.start, end: sel?.end });
+      }
+      return;
+    }
+
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.altKey) {
+      const up = e.key === 'ArrowUp';
+      const sel = h.selection();
+      const neighbour = all()[idx + (up ? -1 : 1)];
+      if (!sel || !neighbour) return;
+      if (e.shiftKey) {
+        // Extending past the block's edge switches to selecting whole blocks.
+        const edge = sel.backward || sel.start === sel.end ? sel.start : sel.end;
+        if (up ? edge === 0 : edge === h.plain().length) { stop(); selectRange(id, neighbour.id); }
+        return;
+      }
+      if (up ? h.onFirstLine() : h.onLastLine()) {
+        stop();
+        const r = h.caretRect();
+        const box = h.el.getBoundingClientRect();
+        moveInto(neighbour, up ? 'last' : 'first', r ? r.left : getComputedStyle(h.el).direction === 'rtl' ? box.right : box.left);
+      }
+      return;
+    }
+
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.shiftKey && !e.altKey) {
+      const sel = h.selection();
+      if (!sel || sel.start !== sel.end) return;
+      // In right-to-left text the left arrow moves forward.
+      const forward = (e.key === 'ArrowRight') !== (getComputedStyle(h.el).direction === 'rtl');
+      if (!forward && sel.start === 0 && all()[idx - 1]) { stop(); stepFrom(id, -1); }
+      else if (forward && sel.end === h.plain().length && all()[idx + 1]) { stop(); stepFrom(id, 1); }
+    }
+  };
+
+  const onTextPaste = (id: string, raw: string, h: EditableHandle) => {
+    const idx = indexOf(id);
+    const text = raw.replace(/\r\n?/g, '\n');
+    if (idx === -1 || !text) return;
+    if (plainPaste.current) {
+      plainPaste.current = false;
+      h.insert([{ text }]);
+      return;
+    }
+    const b = all()[idx];
+    const len = h.plain().length;
+    const sel = h.selection() ?? { start: len, end: len };
+    // A link pasted over selected text links that text.
+    if (sel.start !== sel.end && /^(https?:\/\/|mailto:)\S+$/.test(text.trim())) { h.setLink(sel.start, sel.end, text.trim()); return; }
+
+    const parsed = parseMarkdownBlocks(text);
+    const blank = len === 0 && b.type === 'paragraph';
+    const inline = parsed.length === 1 && (parsed[0].type === 'paragraph' ? !imageOf(parsed[0]) || !blank : !blank);
+    if (inline) {
+      // One line into existing text: its markdown formatting comes along, block markers stay literal.
+      h.insert(mdToRuns(text.replace(/\n+$/, '')));
+      return;
+    }
+
+    const [left, right] = h.splitAt(sel.start, sel.end);
+    let out: Block[];
+    if (blank) out = parsed;
+    else if (parsed[0].type === 'paragraph' && !imageOf(parsed[0])) out = [withText(b, left + parsed[0].text), ...parsed.slice(1)];
+    else out = [...(left ? [withText(b, left)] : []), ...parsed];
+    const last = out[out.length - 1];
+    let focus: Focus = { id: last.id, at: 'end' };
+    if (right) {
+      if (isText(last.type) && !imageOf(last)) {
+        focus = { id: last.id, at: textLength(textOf(last)) };
+        out[out.length - 1] = withText(last, textOf(last) + right);
+      } else {
+        const tail = block('paragraph', right);
+        out.push(tail);
+        focus = { id: tail.id, at: 0 };
+      }
+    }
+    commit(replaceAt(idx, ...out), { focus });
+  };
+
+  // One stable object for every block; the callbacks always see the latest render.
+  const impl = useRef<Omit<EditableHub, 'register'>>(null!);
+  impl.current = {
+    onChange: onTextChange,
+    onKeyDown: onTextKey,
+    onFocus: id => {
+      focusedRef.current = id;
+      if (selected) setSelected(null);
+    },
+    onBlur: id => {
+      if (focusedRef.current === id) focusedRef.current = null;
+      setSlash(null);
+    },
+    onPaste: onTextPaste,
+    onUndo: undo,
+    onRedo: redo,
+    onOpenLink: href => { if (href) void openUrl(href).catch(() => window.open(href, '_blank', 'noopener')); },
+  };
+  const hub = useMemo<EditableHub>(() => ({
+    register: (id, handle) => { if (handle) handles.current.set(id, handle); else handles.current.delete(id); },
+    onChange: (...a) => impl.current.onChange(...a),
+    onKeyDown: (...a) => impl.current.onKeyDown(...a),
+    onFocus: id => impl.current.onFocus(id),
+    onBlur: id => impl.current.onBlur(id),
+    onPaste: (...a) => impl.current.onPaste(...a),
+    onUndo: () => impl.current.onUndo(),
+    onRedo: () => impl.current.onRedo(),
+    onOpenLink: href => impl.current.onOpenLink(href),
+  }), []);
+
+  /* ─── Text actions (selection toolbar, right-click menu) ────────────── */
+
+  /** Copies the selected text as markdown; `cut` also removes it. */
+  const copyText = (id: string, cut: boolean) => {
+    const h = handles.current.get(id);
+    const sel = h?.selection();
+    if (!h || !sel || sel.start === sel.end) return;
+    const runs = h.runs();
+    navigator.clipboard.writeText(runsToMd(sliceRuns(runs, sel.start, sel.end))).catch(() => {});
+    if (cut) h.setRuns(replaceRange(runs, sel.start, sel.end, []), sel.start);
+  };
+
+  const pasteText = async (id: string, plain: boolean) => {
+    const h = handles.current.get(id);
+    if (!h) return;
+    let text: string | null = null;
+    try { text = await navigator.clipboard.readText(); } catch { /* clipboard read not allowed */ }
+    if (text === null) {
+      // Let the webview paste instead; the text arrives through onPaste.
+      plainPaste.current = plain;
+      if (!document.execCommand('paste')) plainPaste.current = false;
+      return;
+    }
+    if (!text) return;
+    plainPaste.current = plain;
+    onTextPaste(id, text, h);
+  };
+
+  const openTextMenu = (id: string, x: number, y: number) => {
+    const h = handles.current.get(id);
+    if (!h) return;
+    const len = h.plain().length;
+    const sel = h.selection() ?? { start: len, end: len };
+    setSlash(null);
+    setMenu(null);
+    setFormat(null);
+    setTextMenu({
+      blockId: id, x, y, start: sel.start, end: sel.end,
+      marks: h.selection() ? h.activeMarks() : {},
+      canLink: sel.start !== sel.end || !!h.linkAt(sel.start),
     });
   };
 
-  const insertAfter = (blockId: string, nextBlock = block('paragraph')) => {
-    const idx = blocks.findIndex(b => b.id === blockId);
-    const next = [...blocks.slice(0, idx + 1), nextBlock, ...blocks.slice(idx + 1)];
-    emit(next);
-    setFocusedId(nextBlock.id);
-    window.setTimeout(() => {
-      document.querySelector<HTMLTextAreaElement>(`[data-block-input="${nextBlock.id}"]`)?.focus();
-    }, 0);
+  const runTextAction = (action: TextAction) => {
+    const m = textMenuRef.current;
+    if (!m) return;
+    textMenuRef.current = null;
+    setTextMenu(null);
+    const h = handles.current.get(m.blockId);
+    if (!h) return;
+    if (action === 'block') { setMenu({ blockId: m.blockId, x: m.x, y: m.y }); return; }
+    // Put back the selection the menu was opened on.
+    h.focus(m.start, m.end);
+    if (action === 'cut' || action === 'copy') copyText(m.blockId, action === 'cut');
+    else if (action === 'paste' || action === 'pastePlain') void pasteText(m.blockId, action === 'pastePlain');
+    else if (action === 'selectAll') h.focus(0, h.plain().length);
+    else if (action === 'link') openLinkEditor(m.blockId);
+    else h.toggleMark(action);
   };
 
-  const removeBlock = (blockId: string) => {
-    if (blocks.length === 1) {
-      emit([block('paragraph')]);
+  /* ─── Selection toolbar ─────────────────────────────────────────────── */
+
+  useEffect(() => {
+    let mouseDown = false;
+    const update = () => {
+      if (linkRef.current || textMenuRef.current) return;
+      const sel = window.getSelection();
+      const anchor = sel?.anchorNode;
+      const host = anchor && rootRef.current?.contains(anchor)
+        ? (anchor instanceof Element ? anchor : anchor.parentElement)?.closest<HTMLElement>('[data-editable]')
+        : null;
+      const h = host ? handles.current.get(host.dataset.editable ?? '') : null;
+      if (!sel || sel.isCollapsed || !host || !h) { setFormat(null); return; }
+      // While the mouse is still dragging, the toolbar would sit under the pointer.
+      if (mouseDown) return;
+      const r = sel.getRangeAt(0).getBoundingClientRect();
+      if (!r.width && !r.height) { setFormat(null); return; }
+      setFormat({ blockId: host.dataset.editable!, rect: { left: r.left, right: r.right, top: r.top, bottom: r.bottom }, marks: h.activeMarks() });
+    };
+    const onSelection = () => {
+      update();
+      const id = focusedRef.current;
+      if (slashRef.current && id) refreshSlash(id);
+    };
+    const onDown = (e: MouseEvent) => {
+      if ((e.target as Element | null)?.closest?.('.format-toolbar')) return;
+      mouseDown = true;
+      setFormat(null);
+    };
+    const onUp = () => { mouseDown = false; window.setTimeout(update, 0); };
+    document.addEventListener('selectionchange', onSelection);
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('scroll', update, true);
+    return () => {
+      document.removeEventListener('selectionchange', onSelection);
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('scroll', update, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ─── Keys while whole blocks are selected, and editor-wide shortcuts ── */
+
+  const onRootKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.defaultPrevented) return;
+    const mod = (e.ctrlKey || e.metaKey) && !e.altKey;
+    const stop = () => e.preventDefault();
+    if (mod && e.code === 'KeyZ') { stop(); if (e.shiftKey) redo(); else undo(); return; }
+    if (mod && e.code === 'KeyY') { stop(); redo(); return; }
+    if (!selRange || e.target !== e.currentTarget) return;
+
+    const list = all();
+    const ids = selectedIds;
+    if (e.key === 'Escape') { stop(); setSelected(null); return; }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      stop();
+      const delta = e.key === 'ArrowUp' ? -1 : 1;
+      if (mod && e.shiftKey) { nudge(ids, delta); return; }
+      const target = list[Math.max(0, Math.min(list.length - 1, selRange.focus + delta))];
+      if (e.shiftKey) selectRange(selected!.anchor, target.id);
+      else selectRange(target.id, target.id);
       return;
     }
-    const idx = blocks.findIndex(b => b.id === blockId);
-    const next = blocks.filter(b => b.id !== blockId);
-    emit(next);
-    const focusId = next[Math.max(0, idx - 1)]?.id;
-    window.setTimeout(() => {
-      document.querySelector<HTMLTextAreaElement>(`[data-block-input="${focusId}"]`)?.focus();
-    }, 0);
+    if (e.key === 'Enter') { stop(); setSelected(null); focusNow({ id: list[selRange.focus].id, at: 'end' }); return; }
+    if (e.key === 'Backspace' || e.key === 'Delete') { stop(); setSelected(null); removeBlocks(ids); return; }
+    if (e.key === 'Tab') { stop(); indentBy(ids, e.shiftKey ? -1 : 1); return; }
+    if (mod && e.code === 'KeyA') { stop(); selectRange(list[0].id, list[list.length - 1].id); return; }
+    if (mod && e.code === 'KeyD') { stop(); duplicate(ids, true); return; }
+    if (mod && e.code === 'KeyC') { stop(); copyBlocks(ids); return; }
+    if (mod && e.code === 'KeyX') { stop(); copyBlocks(ids); setSelected(null); removeBlocks(ids); return; }
+    if (mod && e.shiftKey && DIGIT_TYPES[e.code] && ids.length === 1) { stop(); setSelected(null); convertBlock(ids[0], DIGIT_TYPES[e.code]); }
   };
 
-  const TEXT_TYPES: BlockType[] = ['paragraph', 'heading1', 'heading2', 'heading3', 'quote', 'bullet', 'numbered'];
+  /* ─── Mouse: selecting across blocks, clicking the margins ──────────── */
 
-  const focusBlock = (blockId: string) => {
-    window.setTimeout(() => {
-      const el = document.querySelector<HTMLTextAreaElement>(`[data-block-input="${blockId}"]`);
-      if (!el) return;
-      el.focus();
-      if ('selectionStart' in el) el.selectionStart = el.selectionEnd = el.value.length;
-    }, 0);
-  };
-
-  // Keeps the block's text (minus a `/command` being typed); callouts drop their emoji line.
-  const convertBlock = async (blockId: string, type: BlockType) => {
-    const current = blocks.find(b => b.id === blockId);
-    setSlashFor(null);
-    if (!current) return;
-    const raw = slashQuery(current.text) !== null ? '' : current.text;
-    const existing = current.type === 'callout' ? calloutParts(raw).content : raw;
-    if (current.type === type && raw === current.text) return;
-    if (type === 'callout') {
-      updateBlock(blockId, { type, text: `💡\n${existing}` });
-    } else if (type === 'table') {
-      updateBlock(blockId, { type, text: 'Column 1|Column 2\n|' });
-    } else if (type === 'divider') {
-      updateBlock(blockId, { type, text: '' });
-    } else {
-      updateBlock(blockId, { type, text: existing });
+  const rowAtY = (clientY: number): string | null => {
+    const rows = Array.from(rootRef.current?.querySelectorAll<HTMLElement>('[data-block-row]') ?? []);
+    let best: { id: string; d: number } | null = null;
+    for (const row of rows) {
+      const r = row.getBoundingClientRect();
+      const d = clientY < r.top ? r.top - clientY : clientY > r.bottom ? clientY - r.bottom : 0;
+      if (!best || d < best.d) best = { id: row.dataset.blockRow!, d };
+      if (d === 0) break;
     }
-    if (TEXT_TYPES.includes(type)) { setFocusedId(blockId); focusBlock(blockId); }
-    else setFocusedId(null);
+    return best?.id ?? null;
   };
 
-  const runSlashItem = (blockId: string, item: SlashItem) => {
-    if (item.type === 'image') void insertImageBlock(blockId);
-    else void convertBlock(blockId, item.type);
+  const onRootMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('.block-editor-controls')) return;
+    const row = target.closest<HTMLElement>('[data-block-row]')?.dataset.blockRow ?? null;
+
+    // Shift+click on another block selects everything in between.
+    const from = selected?.anchor ?? focusedRef.current;
+    if (e.shiftKey && row && from && from !== row) { e.preventDefault(); selectRange(from, row); return; }
+    if (selected) setSelected(null);
+
+    const anchor = row ?? rowAtY(e.clientY);
+    if (!anchor) return;
+    const startY = e.clientY;
+    let active = false;
+    const move = (ev: MouseEvent) => {
+      const over = rowAtY(ev.clientY);
+      if (!over) return;
+      // Inside the block it started in, a drag selects text as usual.
+      if (!active && (row ? over === row : Math.abs(ev.clientY - startY) < 6)) return;
+      if (!active) {
+        active = true;
+        rootRef.current?.classList.add('is-block-selecting');
+      }
+      selectRange(anchor, over);
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+      rootRef.current?.classList.remove('is-block-selecting');
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
   };
 
-  const slashItems = useMemo(
-    () => SLASH_ITEMS.filter(item => item.type !== 'image' || onInsertImage),
-    [onInsertImage],
-  );
-
-  const [menu, setMenu] = useState<{ blockId: string; x: number; y: number } | null>(null);
-
-  // Opens the block menu under a button; `align` says which edge of the button it lines up with.
-  const MENU_WIDTH = 240;
-  // The menu closes on any outside mousedown, which includes its own trigger; without this
-  // a second click on ⋯ would close and immediately reopen it.
-  const lastClosed = useRef<{ blockId: string; at: number } | null>(null);
-  const closeMenu = () => {
-    if (menu) lastClosed.current = { blockId: menu.blockId, at: Date.now() };
-    setMenu(null);
-  };
-  const openMenuAt = (blockId: string, button: HTMLElement, align: 'start' | 'end') => {
-    const closed = lastClosed.current;
-    if (closed?.blockId === blockId && Date.now() - closed.at < 400) { lastClosed.current = null; return; }
-    if (menu?.blockId === blockId) { closeMenu(); return; }
-    const r = button.getBoundingClientRect();
-    const rtl = document.documentElement.dir === 'rtl';
-    const alignRight = (align === 'end') !== rtl;
-    setSlashFor(null);
-    setMenu({ blockId, x: alignRight ? r.right - MENU_WIDTH : r.left, y: r.bottom + 4 });
+  // A click beside or below the text lands in the nearest block (a new one after the last).
+  const onRootClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget || selected) return;
+    const list = all();
+    const last = list[list.length - 1];
+    const lastRow = rootRef.current?.querySelector(`[data-block-row="${last.id}"]`)?.getBoundingClientRect();
+    if (lastRow && e.clientY > lastRow.bottom) {
+      if (last.type === 'paragraph' && last.text === '') focusNow({ id: last.id });
+      else insertAfter(last.id);
+      return;
+    }
+    const id = rowAtY(e.clientY);
+    if (id) focusNow({ id, at: 'end' });
   };
 
-  const duplicateBlock = (blockId: string) => {
-    const source = blocks.find(b => b.id === blockId);
-    if (source) insertAfter(blockId, block(source.type, source.text));
-  };
-
-  const insertImageBlock = async (blockId: string) => {
-    if (!onInsertImage) return;
-    const url = await onInsertImage();
-    if (!url) return;
-    const name = url.split('/').pop()?.replace(/\.[^.]+$/, '') ?? 'image';
-    updateBlock(blockId, { type: 'paragraph', text: `![${name}](${url})` });
-    setSlashFor(null);
-  };
-
-  /** Moves a block so it lands at `slot` (an index between blocks, 0..length). */
-  const moveBlock = (blockId: string, slot: number) => {
-    const from = blocks.findIndex(b => b.id === blockId);
-    if (from === -1 || slot === from || slot === from + 1) return;
-    const moving = blocks[from];
-    const without = blocks.filter(b => b.id !== blockId);
-    const at = slot > from ? slot - 1 : slot;
-    emit([...without.slice(0, at), moving, ...without.slice(at)]);
-    setJustDropped(blockId);
-  };
+  /* ─── Drag and drop ─────────────────────────────────────────────────── */
 
   // Nearest gap to the pointer: before the first row whose middle is below it, else after the last.
   const dropSlotAt = (clientY: number): number => {
@@ -1217,10 +946,13 @@ export function BlockEditor({ value, onChange, editorStyle, onInsertImage }: Pro
   };
 
   const dragActive = useRef(false);
-  const endDrag = () => { dragActive.current = false; setDraggingId(null); setDropSlot(null); };
+  const endDrag = () => { dragActive.current = false; setDraggingIds(null); setDropSlot(null); };
+
+  const typeLabel = (type: BlockType) => t(`blocks.types.${type}`);
 
   // A small floating card under the cursor instead of the browser's translucent screenshot.
   const startDrag = (e: React.DragEvent, b: Block) => {
+    const ids = selectedIds.includes(b.id) ? selectedIds : [b.id];
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData(BLOCK_MIME, b.id);
     // The padded outer box leaves room for the card's shadow (drag images clip to the element).
@@ -1228,14 +960,15 @@ export function BlockEditor({ value, onChange, editorStyle, onInsertImage }: Pro
     ghost.className = 'block-drag-ghost';
     const card = document.createElement('div');
     card.className = 'block-drag-ghost-card';
+    card.dir = 'auto';
     ghost.appendChild(card);
     const label = document.createElement('span');
     label.className = 'block-drag-ghost-type';
-    label.textContent = blockLabel(b.type);
+    label.textContent = ids.length > 1 ? t('blocks.count', { count: ids.length }) : typeLabel(b.type);
     const text = document.createElement('span');
     text.className = `block-drag-ghost-text${b.type.startsWith('heading') ? ' heading' : ''}`;
-    const plain = b.type === 'callout' ? calloutParts(b.text).content : b.text;
-    text.textContent = /^!\[/.test(plain.trim()) ? 'Image' : plain.replace(/\s+/g, ' ').trim().slice(0, 90) || 'Empty block';
+    const plain = b.type === 'code' ? parseCodeText(b.text).code : plainOf(mdToRuns(textOf(b)));
+    text.textContent = imageOf(b) ? typeLabel('paragraph') : plain.replace(/\s+/g, ' ').trim().slice(0, 90) || typeLabel(b.type);
     card.append(label, text);
     document.body.appendChild(ghost);
     e.dataTransfer.setDragImage(ghost, 30, 30);
@@ -1246,23 +979,99 @@ export function BlockEditor({ value, onChange, editorStyle, onInsertImage }: Pro
     requestAnimationFrame(() => {
       // A very short drag can end before this frame.
       if (!dragActive.current) return;
-      setDraggingId(b.id);
-      setSlashFor(null);
+      setDraggingIds(ids);
+      setSlash(null);
       setMenu(null);
     });
   };
 
-  const dragFrom = draggingId ? blocks.findIndex(b => b.id === draggingId) : -1;
+  const dragFrom = draggingIds ? blocks.findIndex(b => b.id === draggingIds[0]) : -1;
+  const dragTo = draggingIds ? blocks.findIndex(b => b.id === draggingIds[draggingIds.length - 1]) : -1;
   // Dropping right next to itself changes nothing, so no indicator there.
-  const activeSlot = dropSlot !== null && dropSlot !== dragFrom && dropSlot !== dragFrom + 1 ? dropSlot : null;
+  const activeSlot = dropSlot !== null && (dropSlot < dragFrom || dropSlot > dragTo + 1) ? dropSlot : null;
+
+  /* ─── Block menu ────────────────────────────────────────────────────── */
+
+  // The menu closes on any outside mousedown, which includes its own trigger; without this
+  // a second click on the handle would close and immediately reopen it.
+  const lastClosed = useRef<{ blockId: string; at: number } | null>(null);
+  const closeMenu = () => {
+    if (menu) lastClosed.current = { blockId: menu.blockId, at: Date.now() };
+    setMenu(null);
+  };
+  const openMenuAt = (blockId: string, button: HTMLElement) => {
+    const closed = lastClosed.current;
+    if (closed?.blockId === blockId && Date.now() - closed.at < 400) { lastClosed.current = null; return; }
+    if (menu?.blockId === blockId) { closeMenu(); return; }
+    const r = button.getBoundingClientRect();
+    setSlash(null);
+    setMenu({ blockId, x: uiDir === 'rtl' ? r.right - 240 : r.left, y: r.bottom + 4 });
+  };
+  const menuIds = menu ? (selectedIds.includes(menu.blockId) ? selectedIds : [menu.blockId]) : [];
+
+  /** The + button: a new line below (above with Alt) with the block menu open. */
+  const addNear = (b: Block, above: boolean) => {
+    setSelected(null);
+    if (b.type === 'paragraph' && b.text === '') {
+      commit(replaceAt(indexOf(b.id), { ...b, text: '/' }), { focus: { id: b.id, at: 'end', slash: true } });
+      return;
+    }
+    const nb = block('paragraph', '/');
+    const idx = indexOf(b.id) + (above ? 0 : 1);
+    slashDismissed.current = null;
+    commit([...all().slice(0, idx), nb, ...all().slice(idx)], { focus: { id: nb.id, at: 'end', slash: true } });
+  };
+
+  const openImage = (b: Block, alt: string, src: string) => {
+    const edit = () => setRawImage(b.id);
+    if (!images) { edit(); return; }
+    images.openViewer({ src, alt, onEdit: edit, onReplaceSrc: next => updateBlock(b.id, { text: `![${alt}](${next})` }, false) });
+  };
+
+  /* ─── Render ────────────────────────────────────────────────────────── */
+
+  // A `/command` being typed is not part of the writing: an Arabic search word must not flip
+  // an English line (and the menu hanging from it) to the other side.
+  const dirs = blockDirs(slash ? blocks.map(b => {
+    if (b.id !== slash.blockId) return b;
+    const text = textOf(b);
+    const at = text.lastIndexOf(`/${slash.query}`);
+    return at === -1 ? b : withText(b, text.slice(0, at) + text.slice(at + slash.query.length + 1));
+  }) : blocks, uiDir);
+  const numbers = listNumbers(blocks);
+  const solo = blocks.length === 1;
+
+  const placeholderFor = (b: Block) => {
+    if (b.type === 'paragraph') return t('blocks.placeholder');
+    if (b.type === 'bullet' || b.type === 'numbered') return t('blocks.listPlaceholder');
+    if (b.type === 'todo') return t('blocks.todoPlaceholder');
+    if (b.type === 'quote') return t('blocks.quotePlaceholder');
+    if (b.type === 'callout') return t('blocks.calloutPlaceholder');
+    return typeLabel(b.type);
+  };
+
+  const slashBlock = slash ? blocks.findIndex(b => b.id === slash.blockId) : -1;
 
   return (
     <div
       ref={rootRef}
-      className={`block-editor${draggingId ? ' is-dragging' : ''}`}
+      className={`block-editor${draggingIds ? ' is-dragging' : ''}`}
       style={editorStyle}
+      tabIndex={-1}
+      onKeyDown={onRootKey}
+      onMouseDown={onRootMouseDown}
+      onClick={onRootClick}
+      onPaste={e => {
+        if (!selRange || e.target !== e.currentTarget) return;
+        e.preventDefault();
+        const text = e.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n');
+        if (!text.trim()) return;
+        const parsed = parseMarkdownBlocks(text);
+        commit([...all().slice(0, selRange.hi + 1), ...parsed, ...all().slice(selRange.hi + 1)]);
+        setSelected({ anchor: parsed[0].id, focus: parsed[parsed.length - 1].id });
+      }}
       onDragOver={e => {
-        if (!draggingId || !e.dataTransfer.types.includes(BLOCK_MIME)) return;
+        if (!draggingIds || !e.dataTransfer.types.includes(BLOCK_MIME)) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         autoScroll(e.clientY);
@@ -1273,46 +1082,50 @@ export function BlockEditor({ value, onChange, editorStyle, onInsertImage }: Pro
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropSlot(null);
       }}
       onDrop={e => {
-        if (!draggingId || !e.dataTransfer.types.includes(BLOCK_MIME)) return;
+        if (!draggingIds || !e.dataTransfer.types.includes(BLOCK_MIME)) return;
         e.preventDefault();
-        moveBlock(draggingId, dropSlotAt(e.clientY));
+        if (moveTo(draggingIds, dropSlotAt(e.clientY))) setJustDropped(draggingIds);
         endDrag();
       }}
     >
       {blocks.map((b, index) => {
-        const query = slashFor === b.id ? slashQuery(b.text) : null;
-        const slashOpen = query !== null;
-        const matches = slashOpen ? filterSlashItems(slashItems, query) : [];
+        const dir = dirs[index];
         const textStyle = blockTextStyle(b.type, editorStyle);
-        const imgMatch = b.type === 'paragraph'
-          ? /^!\[([^\]]*)\]\(([^)]+)\)\s*$/.exec(b.text.trim())
-          : null;
-        const isEditing = focusedId === b.id || b.text.trim() === '';
-        // `caret` comes from the click in view mode; without it the caret goes to the end.
-        const enterEditMode = (caret?: [number, number] | null) => {
-          setFocusedId(b.id);
-          window.setTimeout(() => {
-            const el = document.querySelector<HTMLTextAreaElement>(`[data-block-input="${b.id}"]`);
-            if (!el) return;
-            el.focus({ preventScroll: true });
-            const len = el.value.length;
-            const [start, end] = caret ?? [len, len];
-            el.setSelectionRange(Math.min(start, len), Math.min(end, len));
-          }, 0);
+        const img = imageOf(b);
+        const line = firstLine(img ? 'image' : b.type, textStyle);
+        const isSelected = selRange !== null && index >= selRange.lo && index <= selRange.hi;
+        const shellKeys = (e: React.KeyboardEvent, onEnter: () => void) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === 'Enter') { e.preventDefault(); onEnter(); }
+          else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); stepFrom(b.id, -1); }
+          else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); stepFrom(b.id, 1); }
+          else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); removeBlocks([b.id]); }
+          else if (e.key === 'Escape') { e.preventDefault(); selectRange(b.id, b.id); }
         };
-        const line = firstLine(b.type, textStyle);
+        const callout = b.type === 'callout' ? calloutParts(b.text) : null;
+
         return (
           <div
             key={b.id}
             data-block-row={b.id}
-            className={`block-editor-row${draggingId === b.id ? ' dragging' : ''}${justDropped === b.id ? ' just-dropped' : ''}${menu?.blockId === b.id ? ' menu-open' : ''}`}
+            data-type={img ? 'image' : b.type}
+            className={`block-editor-row${draggingIds?.includes(b.id) ? ' dragging' : ''}${justDropped?.includes(b.id) ? ' just-dropped' : ''}${menu && menuIds.includes(b.id) ? ' menu-open' : ''}${isSelected ? ' selected' : ''}`}
             // Side buttons and list markers centre on the first line (see firstLine).
-            style={{ '--line-top': `${line.top}px`, '--line-h': `${line.height}px` } as React.CSSProperties}
-            // Shift+right-click keeps the native menu (copy / paste).
+            style={{ '--line-top': `${line.top}px`, '--line-h': `${line.height}px`, '--indent': b.indent ?? 0 } as React.CSSProperties}
+            // Right-click in text opens the text menu; elsewhere in the row, the block menu.
+            // Shift+right-click keeps the native menu (spell-check suggestions).
             onContextMenu={e => {
               if (e.shiftKey) return;
+              const host = (e.target as HTMLElement).closest<HTMLElement>('[data-editable]');
+              if (host && handles.current.has(host.dataset.editable ?? '')) {
+                e.preventDefault();
+                openTextMenu(host.dataset.editable!, e.clientX, e.clientY);
+                return;
+              }
+              // Code and table fields keep the native menu for their own text.
+              if ((e.target as HTMLElement).closest('textarea, input')) return;
               e.preventDefault();
-              setSlashFor(null);
+              setSlash(null);
               setMenu({ blockId: b.id, x: e.clientX, y: e.clientY });
             }}
           >
@@ -1321,360 +1134,242 @@ export function BlockEditor({ value, onChange, editorStyle, onInsertImage }: Pro
             <div className="block-editor-controls">
               <button
                 type="button"
+                className="block-editor-add"
+                onMouseDown={e => e.preventDefault()}
+                onClick={e => addNear(b, e.altKey)}
+                title={t('blocks.addHint')}
+                aria-label={t('blocks.add')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </button>
+              <button
+                type="button"
                 draggable
                 onDragStart={e => startDrag(e, b)}
                 onDragEnd={endDrag}
                 onKeyDown={e => {
                   // Keyboard reordering: focus the handle, then Arrow Up / Down.
-                  if (e.key === 'ArrowUp' && index > 0) { e.preventDefault(); moveBlock(b.id, index - 1); }
-                  if (e.key === 'ArrowDown' && index < blocks.length - 1) { e.preventDefault(); moveBlock(b.id, index + 2); }
-                  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                    window.setTimeout(() => rootRef.current?.querySelector<HTMLElement>(`[data-block-row="${b.id}"] .block-editor-handle`)?.focus(), 0);
-                  }
+                  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  nudge([b.id], e.key === 'ArrowUp' ? -1 : 1);
+                  window.setTimeout(() => rootRef.current?.querySelector<HTMLElement>(`[data-block-row="${b.id}"] .block-editor-handle`)?.focus(), 0);
                 }}
                 // A click without dragging opens the block menu (drag never fires click).
-                onClick={e => openMenuAt(b.id, e.currentTarget, 'start')}
+                onClick={e => openMenuAt(b.id, e.currentTarget)}
                 className="block-editor-handle"
-                title="Drag to move · Click for options"
-                aria-label="Drag block, or click for options"
+                title={t('blocks.handleHint')}
+                aria-label={t('blocks.handle')}
                 aria-haspopup="menu"
+                aria-expanded={menu?.blockId === b.id}
               >
                 <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">
-                  <circle cx="3"  cy="3"  r="1.4" />
-                  <circle cx="7"  cy="3"  r="1.4" />
-                  <circle cx="3"  cy="8"  r="1.4" />
-                  <circle cx="7"  cy="8"  r="1.4" />
-                  <circle cx="3"  cy="13" r="1.4" />
-                  <circle cx="7"  cy="13" r="1.4" />
+                  <circle cx="3" cy="3" r="1.4" /><circle cx="7" cy="3" r="1.4" />
+                  <circle cx="3" cy="8" r="1.4" /><circle cx="7" cy="8" r="1.4" />
+                  <circle cx="3" cy="13" r="1.4" /><circle cx="7" cy="13" r="1.4" />
                 </svg>
               </button>
             </div>
 
-            <div className="block-editor-content">
-              {b.type === 'callout' ? (
-                <CalloutBlock
-                  text={b.text}
-                  editorStyle={editorStyle}
-                  isEditing={focusedId === b.id || b.text.trim() === ''}
-                  blockId={b.id}
-                  onEnterEdit={() => enterEditMode()}
-                  onFocus={() => { setFocusedId(b.id); setSlashFor(null); }}
-                  onBlur={() => setFocusedId(null)}
-                  onChange={v => updateBlock(b.id, { text: v })}
-                  onInsertAfter={() => insertAfter(b.id)}
-                  onRemove={() => removeBlock(b.id)}
-                />
-              ) : b.type === 'divider' ? (
+            <div className="block-editor-content" dir={dir}>
+              {b.type === 'divider' ? (
                 <div
                   className="divider-block"
                   tabIndex={0}
                   role="separator"
                   data-block-input={b.id}
-                  onFocus={() => setSlashFor(null)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') { e.preventDefault(); insertAfter(b.id); }
-                    if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); removeBlock(b.id); }
-                  }}
+                  onKeyDown={e => shellKeys(e, () => insertAfter(b.id))}
                 >
                   <hr className="divider-line" />
                 </div>
               ) : b.type === 'table' ? (
                 <TableBlock
+                  blockId={b.id}
                   text={b.text}
                   editorStyle={editorStyle}
-                  isEditing={focusedId === b.id || b.text.trim() === ''}
-                  onEnterEdit={() => setFocusedId(b.id)}
-                  onBlur={() => setFocusedId(null)}
+                  isEditing={editingTable === b.id}
+                  onEnterEdit={() => { setSelected(null); setEditingTable(b.id); }}
+                  onBlur={() => setEditingTable(id => (id === b.id ? null : id))}
                   onChange={v => updateBlock(b.id, { text: v })}
-                  onInsertAfter={() => insertAfter(b.id)}
-                  onRemove={() => removeBlock(b.id)}
+                  onNavigate={delta => { setEditingTable(null); stepFrom(b.id, delta); }}
+                  onRemove={() => removeBlocks([b.id])}
+                  onEscape={() => { setEditingTable(null); selectRange(b.id, b.id); }}
                 />
               ) : b.type === 'code' ? (
                 <CodeBlock
+                  blockId={b.id}
                   text={b.text}
-                  onFocus={() => setSlashFor(null)}
+                  onFocus={() => { focusedRef.current = b.id; setSlash(null); if (selected) setSelected(null); }}
                   onChange={v => updateBlock(b.id, { text: v })}
-                  onInsertAfter={() => insertAfter(b.id)}
-                  onRemove={() => removeBlock(b.id)}
+                  onExit={() => insertAfter(b.id)}
+                  onNavigate={delta => stepFrom(b.id, delta)}
+                  onRemove={() => convertBlock(b.id, 'paragraph')}
+                  onEscape={() => selectRange(b.id, b.id)}
                 />
-              ) : imgMatch && !isEditing ? (
+              ) : img && rawImage === b.id ? (
+                <input
+                  autoFocus
+                  dir="ltr"
+                  className="image-raw-input"
+                  value={b.text}
+                  aria-label={typeLabel('paragraph')}
+                  onChange={e => updateBlock(b.id, { text: e.target.value })}
+                  onBlur={() => setRawImage(null)}
+                  onKeyDown={e => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); setRawImage(null); pending.current = { id: b.id }; }
+                  }}
+                />
+              ) : img ? (
                 <div
                   className="image-block"
                   tabIndex={0}
                   data-block-input={b.id}
-                  onClick={() => openImage(b.id, imgMatch[1], imgMatch[2], enterEditMode)}
-                  onDoubleClick={() => enterEditMode()}
+                  onClick={() => openImage(b, img[1], img[2])}
                   onKeyDown={e => {
-                    if (e.key === 'Enter') { e.preventDefault(); insertAfter(b.id); }
-                    if (e.key === ' ') { e.preventDefault(); openImage(b.id, imgMatch[1], imgMatch[2], enterEditMode); }
-                    if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); removeBlock(b.id); }
+                    if (e.key === ' ') { e.preventDefault(); openImage(b, img[1], img[2]); return; }
+                    shellKeys(e, () => insertAfter(b.id));
                   }}
                 >
-                  <ResolvedImg
-                    src={imgMatch[2]}
-                    alt={imgMatch[1]}
-                    className="image-block-img"
-                    onOpen={() => openImage(b.id, imgMatch[1], imgMatch[2], enterEditMode)}
+                  <ResolvedImg src={img[2]} alt={img[1]} className="image-block-img" onOpen={() => openImage(b, img[1], img[2])} />
+                </div>
+              ) : (
+                <div className={`block-body block-body-${b.type}${b.type === 'todo' && b.checked ? ' checked' : ''}`}>
+                  {b.type === 'bullet' && <span key="marker" className="block-marker" aria-hidden="true">{BULLETS[(b.indent ?? 0) % BULLETS.length]}</span>}
+                  {b.type === 'numbered' && <span key="marker" className="block-marker block-marker-number" aria-hidden="true">{numbers[index] ?? 1}.</span>}
+                  {b.type === 'todo' && (
+                    <button
+                      key="marker"
+                      type="button"
+                      role="checkbox"
+                      aria-checked={!!b.checked}
+                      aria-label={typeLabel('todo')}
+                      className="block-todo-box"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => updateBlock(b.id, { checked: !b.checked }, false)}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    </button>
+                  )}
+                  {callout && (
+                    <button
+                      key="marker"
+                      type="button"
+                      className="callout-emoji-btn"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => {
+                        const cycle = <T,>(items: readonly T[], current: T) => items[(items.indexOf(current) + 1) % items.length];
+                        const head = callout.jsxType ? `type:${cycle(CALLOUT_JSX_TYPES, callout.jsxType)}` : cycle(CALLOUT_EMOJI, callout.emoji);
+                        updateBlock(b.id, { text: `${head}\n${callout.content}` }, false);
+                      }}
+                      title={t('blocks.calloutChange')}
+                      aria-label={t('blocks.calloutChange')}
+                    >
+                      {callout.emoji}
+                      {callout.jsxType && <span className="callout-type-badge">{callout.jsxType}</span>}
+                    </button>
+                  )}
+                  <EditableText
+                    key="text"
+                    blockId={b.id}
+                    text={textOf(b)}
+                    dir={dir}
+                    className={`block-text block-${b.type}${solo ? ' placeholder-always' : ''}`}
+                    style={textStyle}
+                    placeholder={placeholderFor(b)}
+                    hub={hub}
                   />
                 </div>
-              ) : !isEditing ? (
-                <InlineView
-                  text={b.text}
-                  fallback={' '}
-                  className={`block-editor-input block-${b.type} block-view`}
-                  style={textStyle}
-                  onEdit={enterEditMode}
-                />
-              ) : (
-                <AutoTextarea
-                  value={b.text}
-                  dir='auto'
-                  blockId={b.id}
-                  placeholder={index === 0 ? 'Type / for commands' : ''}
-                  className={`block-editor-input block-${b.type}`}
-                  style={textStyle}
-                  onFocus={() => {
-                    setFocusedId(b.id);
-                    setSlashFor(slashQuery(b.text) !== null ? b.id : null);
-                  }}
-                  onBlur={() => { setFocusedId(null); setSlashFor(null); }}
-                  onChange={nextText => {
-                    updateBlock(b.id, { text: nextText });
-                    // Every keystroke re-filters, so the first match is selected again.
-                    setSlashIndex(0);
-                    setSlashFor(slashQuery(nextText) !== null ? b.id : null);
-                  }}
-                  onKeyDown={e => {
-                    if (slashOpen && matches.length > 0) {
-                      if (e.key === 'ArrowDown') {
-                        e.preventDefault();
-                        setSlashIndex(i => (i + 1) % matches.length);
-                        return;
-                      }
-                      if (e.key === 'ArrowUp') {
-                        e.preventDefault();
-                        setSlashIndex(i => (i - 1 + matches.length) % matches.length);
-                        return;
-                      }
-                      if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
-                        e.preventDefault();
-                        runSlashItem(b.id, matches[Math.min(slashIndex, matches.length - 1)]);
-                        return;
-                      }
-                    }
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      insertAfter(b.id);
-                    }
-                    if (e.key === 'Backspace' && b.text === '') {
-                      e.preventDefault();
-                      removeBlock(b.id);
-                    }
-                    if (e.key === 'Escape') setSlashFor(null);
-                  }}
-                />
               )}
-              <div className="block-editor-type">{blockLabel(b.type)}</div>
-
-              {slashOpen && (
-                <div className="slash-menu mac-dropdown" role="listbox" aria-label="Insert block">
-                  {matches.length === 0 ? (
-                    <div className="slash-empty">No blocks match “{query}”</div>
-                  ) : matches.map((item, idx) => (
-                    <button
-                      key={item.type}
-                      type="button"
-                      role="option"
-                      aria-selected={slashIndex === idx}
-                      data-slash-idx={idx}
-                      className={slashIndex === idx ? 'active' : ''}
-                      onMouseEnter={() => setSlashIndex(idx)}
-                      onMouseDown={e => {
-                        e.preventDefault();
-                        runSlashItem(b.id, item);
-                      }}
-                    >
-                      <span className="slash-marker">{item.marker}</span>
-                      <span className="slash-copy">
-                        <strong>{item.label}</strong>
-                        <small>{item.hint}</small>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="block-editor-end">
-              <button
-                type="button"
-                className="block-editor-more"
-                onMouseDown={e => e.preventDefault()}
-                onClick={e => openMenuAt(b.id, e.currentTarget, 'end')}
-                title="Block options"
-                aria-label="Block options"
-                aria-haspopup="menu"
-                aria-expanded={menu?.blockId === b.id}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <circle cx="5" cy="12" r="1.8" />
-                  <circle cx="12" cy="12" r="1.8" />
-                  <circle cx="19" cy="12" r="1.8" />
-                </svg>
-              </button>
             </div>
           </div>
         );
       })}
+
+      {slash && slashBlock !== -1 && (slashMatches.length > 0 || slash.query !== '') && (
+        <SlashMenu
+          items={slashMatches}
+          active={Math.min(slashIndex, Math.max(0, slashMatches.length - 1))}
+          query={slash.query}
+          anchor={slash.anchor}
+          dir={dirs[slashBlock]}
+          onHover={setSlashIndex}
+          onPick={item => void runSlashItem(item)}
+        />
+      )}
+
+      {(format || link) && (() => {
+        const id = (link ?? format)!.blockId;
+        const h = handles.current.get(id);
+        if (!h || !format) return null;
+        return (
+          <FormatToolbar
+            state={format}
+            link={link ? link.value : null}
+            onToggle={key => h.toggleMark(key)}
+            onCopy={() => copyText(id, false)}
+            onCut={() => copyText(id, true)}
+            onMore={button => {
+              const r = button.getBoundingClientRect();
+              openTextMenu(id, uiDir === 'rtl' ? r.right - 240 : r.left, r.bottom + 6);
+            }}
+            onLinkOpen={() => openLinkEditor(id)}
+            onLinkChange={v => setLink(l => (l ? { ...l, value: v } : l))}
+            onLinkApply={() => {
+              const l = linkRef.current;
+              if (!l) return;
+              linkRef.current = null;
+              setLink(null);
+              h.setLink(l.start, l.end, l.value.trim() || null);
+            }}
+            onLinkCancel={() => {
+              const l = linkRef.current;
+              if (!l) return;
+              linkRef.current = null;
+              setLink(null);
+              // Esc returns to the text; a click elsewhere has already moved the focus.
+              if (document.activeElement?.classList.contains('format-toolbar-link')) h.focus(l.start, l.end);
+            }}
+          />
+        );
+      })()}
+
+      {textMenu && (
+        <TextContextMenu
+          x={textMenu.x}
+          y={textMenu.y}
+          hasSelection={textMenu.start !== textMenu.end}
+          marks={textMenu.marks}
+          canLink={textMenu.canLink}
+          onAction={runTextAction}
+          onClose={() => { textMenuRef.current = null; setTextMenu(null); }}
+        />
+      )}
+
       {menu && (() => {
         const target = blocks.find(b => b.id === menu.blockId);
         if (!target) return null;
+        const done = () => { setMenu(null); };
         return (
           <BlockContextMenu
             x={menu.x}
             y={menu.y}
             type={target.type}
+            count={menuIds.length}
             onClose={closeMenu}
-            onTurnInto={type => { setMenu(null); void convertBlock(target.id, type); }}
-            onInsertBelow={() => { setMenu(null); insertAfter(target.id); }}
-            onDuplicate={() => { setMenu(null); duplicateBlock(target.id); }}
-            onDelete={() => { setMenu(null); removeBlock(target.id); }}
+            onTurnInto={type => { done(); setSelected(null); convertBlock(target.id, type); }}
+            onInsertBelow={() => { done(); setSelected(null); insertAfter(menuIds[menuIds.length - 1]); }}
+            onDuplicate={() => { done(); duplicate(menuIds, menuIds.length > 1); }}
+            onCopy={() => { done(); copyBlocks(menuIds); }}
+            onDelete={() => { done(); setSelected(null); removeBlocks(menuIds); }}
           />
         );
       })()}
     </div>
-  );
-}
-
-/* ─── Right-click menu: turn a block into another type ───────────────── */
-
-function BlockContextMenu({ x, y, type, onClose, onTurnInto, onInsertBelow, onDuplicate, onDelete }: {
-  x: number;
-  y: number;
-  type: BlockType;
-  onClose: () => void;
-  onTurnInto: (type: BlockType) => void;
-  onInsertBelow: () => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ left: x, top: y });
-  const [filter, setFilter] = useState('');
-  const [active, setActive] = useState(0);
-
-  // Tables and dividers have no text to carry over, so they only get the block actions.
-  const convertible = TURN_INTO.includes(type);
-  const turnInto = convertible
-    ? filterSlashItems(SLASH_ITEMS.filter(i => (TURN_INTO as string[]).includes(i.type)), filter)
-    : [];
-  const actions = [
-    { id: 'insert', label: 'Insert block below', marker: '+', run: onInsertBelow },
-    { id: 'duplicate', label: 'Duplicate', marker: '⧉', run: onDuplicate },
-    { id: 'delete', label: 'Delete', marker: '⌫', run: onDelete, danger: true },
-  ].filter(a => !filter || a.label.toLowerCase().includes(filter.toLowerCase()));
-  const total = turnInto.length + actions.length;
-  const run = (idx: number) => {
-    if (idx < turnInto.length) onTurnInto(turnInto[idx].type as BlockType);
-    else actions[idx - turnInto.length]?.run();
-  };
-
-  // Keep the menu inside the window.
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    setPos({
-      left: Math.max(8, Math.min(x, window.innerWidth - r.width - 8)),
-      top: Math.max(8, Math.min(y, window.innerHeight - r.height - 8)),
-    });
-  }, [x, y]);
-
-  useEffect(() => {
-    const away = (e: Event) => { if (!ref.current?.contains(e.target as Node)) onClose(); };
-    const close = () => onClose();
-    window.addEventListener('mousedown', away);
-    window.addEventListener('resize', close);
-    window.addEventListener('blur', close);
-    // Capture: the editor scrolls inside its own pane, not the window. The menu's own list may scroll.
-    document.addEventListener('scroll', away, true);
-    return () => {
-      window.removeEventListener('mousedown', away);
-      window.removeEventListener('resize', close);
-      window.removeEventListener('blur', close);
-      document.removeEventListener('scroll', away, true);
-    };
-  }, [onClose]);
-
-  useEffect(() => { setActive(0); }, [filter]);
-
-  useEffect(() => {
-    ref.current?.querySelector<HTMLElement>(`[data-menu-idx="${active}"]`)?.scrollIntoView({ block: 'nearest' });
-  }, [active]);
-
-  return createPortal(
-    <div
-      ref={ref}
-      className="slash-menu block-context-menu mac-dropdown"
-      role="menu"
-      aria-label="Block options"
-      style={{ left: pos.left, top: pos.top }}
-      onContextMenu={e => e.preventDefault()}
-      onKeyDown={e => {
-        if (e.key === 'Escape') { e.preventDefault(); onClose(); }
-        if (total === 0) return;
-        if (e.key === 'ArrowDown') { e.preventDefault(); setActive(i => (i + 1) % total); }
-        if (e.key === 'ArrowUp') { e.preventDefault(); setActive(i => (i - 1 + total) % total); }
-        if (e.key === 'Enter') { e.preventDefault(); run(active); }
-      }}
-    >
-      <input
-        autoFocus
-        className="block-context-filter"
-        value={filter}
-        onChange={e => setFilter(e.target.value)}
-        placeholder={convertible ? 'Turn into…' : 'Search actions…'}
-        aria-label="Filter options"
-      />
-      {turnInto.length > 0 && <div className="block-context-label">Turn into</div>}
-      {turnInto.map((item, idx) => (
-        <button
-          key={item.type}
-          type="button"
-          role="menuitemradio"
-          aria-checked={item.type === type}
-          data-menu-idx={idx}
-          className={active === idx ? 'active' : ''}
-          onMouseEnter={() => setActive(idx)}
-          onClick={() => run(idx)}
-        >
-          <span className="slash-marker">{item.marker}</span>
-          <span className="slash-copy"><strong>{item.label}</strong></span>
-          {item.type === type && <span className="block-context-check" aria-hidden="true">✓</span>}
-        </button>
-      ))}
-      {actions.length > 0 && <div className="block-context-sep" role="separator" />}
-      {actions.map((a, i) => {
-        const idx = turnInto.length + i;
-        return (
-          <button
-            key={a.id}
-            type="button"
-            role="menuitem"
-            data-menu-idx={idx}
-            className={`${active === idx ? 'active' : ''}${a.danger ? ' danger' : ''}`}
-            onMouseEnter={() => setActive(idx)}
-            onClick={() => run(idx)}
-          >
-            <span className="slash-marker">{a.marker}</span>
-            <span className="slash-copy"><strong>{a.label}</strong></span>
-          </button>
-        );
-      })}
-      {total === 0 && <div className="slash-empty">Nothing matches “{filter}”</div>}
-      <div className="block-context-hint">Shift + right-click for copy / paste</div>
-    </div>,
-    document.body,
   );
 }
 
@@ -1686,42 +1381,27 @@ const toPx = (v: string | number | undefined, fallback: number) => {
 /**
  * Where a block's first line sits inside its row, so the side buttons can centre on it:
  * `top` is the space above that line, `height` its line box. Values follow the block CSS
- * (content padding 4px, quote 8px + border, callout 12px + border + 3px, ...).
+ * (content padding 3px, callout 12px + border, ...).
  */
-function firstLine(type: BlockType, textStyle: React.CSSProperties): { top: number; height: number } {
+function firstLine(type: BlockType | 'image', textStyle: React.CSSProperties): { top: number; height: number } {
   const size = toPx(textStyle.fontSize, 15);
   const lh = textStyle.lineHeight;
   // Unitless line height is a multiple of the font size; '28px' is absolute.
   const line = typeof lh === 'string' && lh.endsWith('px') ? toPx(lh, size * 1.6) : size * toPx(lh, 1.6);
   switch (type) {
-    case 'quote':   return { top: 4 + 9, height: line };
-    case 'callout': return { top: 4 + 16, height: size * 1.6 };
-    case 'code':    return { top: 4 + 1, height: 30 };   // language header row
-    case 'table':   return { top: 4 + 3, height: 36 };   // header cells
-    case 'divider': return { top: 4, height: 22 };       // the rule, centred in its padding
-    default:        return { top: 4, height: line };
+    case 'callout': return { top: 3 + 13, height: line };
+    case 'code':    return { top: 3 + 1, height: 30 };   // language header row
+    case 'table':   return { top: 3 + 3, height: 36 };   // header cells
+    case 'divider': return { top: 3, height: 22 };       // the rule, centred in its padding
+    case 'image':   return { top: 3 + 4, height: 26 };
+    default:        return { top: 3, height: line };
   }
 }
 
 function blockTextStyle(type: BlockType, editorStyle: React.CSSProperties): React.CSSProperties {
-  const base: React.CSSProperties = {
-    ...editorStyle,
-    unicodeBidi: type === 'code' ? 'embed' : 'plaintext',
-    textAlign: 'start',
-  };
-
-  if (type === 'heading1') return { ...base, fontSize: 30, fontWeight: 700, lineHeight: 1.25 };
-  if (type === 'heading2') return { ...base, fontSize: 23, fontWeight: 650, lineHeight: 1.3 };
-  if (type === 'heading3') return { ...base, fontSize: 18, fontWeight: 650, lineHeight: 1.35 };
-  if (type === 'code') {
-    return {
-      ...base,
-      fontFamily: "ui-monospace, 'SFMono-Regular', 'Cascadia Code', Consolas, monospace",
-      fontSize: 13,
-      lineHeight: 1.65,
-      direction: 'ltr',
-      textAlign: 'left',
-    };
-  }
-  return base;
+  const size = toPx(editorStyle.fontSize as string | number | undefined, 16);
+  if (type === 'heading1') return { ...editorStyle, fontSize: Math.round(size * 1.875), fontWeight: 700, lineHeight: 1.3 };
+  if (type === 'heading2') return { ...editorStyle, fontSize: Math.round(size * 1.5), fontWeight: 650, lineHeight: 1.35 };
+  if (type === 'heading3') return { ...editorStyle, fontSize: Math.round(size * 1.25), fontWeight: 650, lineHeight: 1.4 };
+  return editorStyle;
 }

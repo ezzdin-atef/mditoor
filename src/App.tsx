@@ -64,7 +64,8 @@ function useGlobalShortcuts() {
   const { navigate } = useRouter();
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+      // `code` covers keyboard layouts where that key types another character (Arabic: و).
+      if ((e.metaKey || e.ctrlKey) && (e.key === ',' || e.code === 'Comma')) {
         e.preventDefault();
         navigate({ page: 'settings' });
       }

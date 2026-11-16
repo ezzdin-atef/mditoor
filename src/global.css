@@ -2298,7 +2298,7 @@ input[type="radio"][readonly] {
 }
 /* Space held for an image while it's looked up, so the text below doesn't jump. */
 .editor-prose img.img-loading,
-.block-view img.img-loading {
+.block-text img.img-loading {
   display: block;
   width: 100%;
   height: 180px;
@@ -2605,9 +2605,6 @@ input[type="radio"][readonly] {
     opacity 0.1s ease,
     transform 0.1s ease;
 }
-.block-editor-row:hover {
-  background: color-mix(in srgb, var(--surface) 72%, transparent);
-}
 /* ─── Block drag and drop ─── */
 /* The block being moved stays in place as a dashed "slot" so you can see where it came from. */
 .block-editor-row.dragging {
@@ -2622,8 +2619,7 @@ input[type="radio"][readonly] {
 }
 .block-editor.is-dragging
   .block-editor-row:not(.dragging)
-  .block-editor-controls,
-.block-editor.is-dragging .block-editor-end {
+  .block-editor-controls {
   opacity: 0;
 }
 .block-editor.is-dragging .block-editor-row.dragging .block-editor-controls {
@@ -2720,8 +2716,7 @@ input[type="radio"][readonly] {
 }
 /* Side columns (drag handle, ⋯ menu): each button is centred on the block's first
    line. --line-top / --line-h are set per block from its font size and type. */
-.block-editor-controls,
-.block-editor-end {
+.block-editor-controls {
   width: 28px;
   flex-shrink: 0;
   display: flex;
@@ -2734,40 +2729,12 @@ input[type="radio"][readonly] {
   transition: opacity 0.1s ease;
 }
 .block-editor-row:hover .block-editor-controls,
-.block-editor-row:focus-within .block-editor-controls,
-.block-editor-row:hover .block-editor-end,
-.block-editor-row:focus-within .block-editor-end,
-.block-editor-row.menu-open .block-editor-controls,
-.block-editor-row.menu-open .block-editor-end {
+.block-editor-controls:focus-within,
+.block-editor-row.menu-open .block-editor-controls {
   opacity: 1;
 }
 /* ⋯ block options, at the end of each row. */
-.block-editor-more {
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: var(--r-xs);
-  background: transparent;
-  color: var(--text-faint);
-  cursor: pointer;
-  transition:
-    background 0.1s ease,
-    color 0.1s ease,
-    transform 0.1s ease;
-}
-.block-editor-more:hover,
-.block-editor-more[aria-expanded="true"] {
-  background: var(--surface-2);
-  color: var(--accent);
-}
-.block-editor-more:active {
-  transform: scale(0.92);
-}
-.block-editor-more:focus-visible,
+.block-editor-add:focus-visible,
 .block-editor-handle:focus-visible {
   outline: none;
   box-shadow: var(--ring);
@@ -2810,7 +2777,7 @@ input[type="radio"][readonly] {
 
 /* View mode (div) and edit mode (textarea) share one box so clicking in or out
    never changes a block's height or shifts its text. */
-.block-editor-input {
+.block-text {
   display: block;
   border-radius: var(--r-xs);
   min-height: 1lh;
@@ -2820,30 +2787,9 @@ input[type="radio"][readonly] {
   white-space: pre-wrap;
 }
 /* Zero specificity: drops the browser's textarea padding but keeps block paddings (quote, code). */
-:where(textarea.block-editor-input) {
-  padding: 0;
-  box-sizing: border-box;
-  vertical-align: top;
-}
-.block-editor-input::placeholder {
-  color: var(--text-faint);
-}
-.block-code {
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  padding: 12px 14px;
-}
-.block-quote {
-  background: var(--callout-bg);
-  border: 1px solid var(--callout-border);
-  border-radius: var(--r-sm);
-  padding: 8px 14px;
-  color: var(--text-muted);
-}
 
 /* ─── Inline formatting view mode ─── */
-.block-view {
+.block-text {
   cursor: text;
   overflow-wrap: break-word;
   word-break: break-word;
@@ -2851,22 +2797,22 @@ input[type="radio"][readonly] {
   min-height: 1lh;
   caret-color: var(--accent);
 }
-.block-view strong {
+.block-text strong {
   font-weight: 700;
 }
-.block-view em {
+.block-text em {
   font-style: italic;
 }
-.block-view del {
+.block-text del {
   text-decoration: line-through;
   opacity: 0.7;
 }
-.block-view a {
+.block-text a {
   color: var(--accent);
   text-decoration: underline;
   cursor: pointer;
 }
-.block-view .inline-code {
+.block-text .inline-code {
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
   font-size: 0.85em;
   background: var(--code-bg);
@@ -2874,7 +2820,7 @@ input[type="radio"][readonly] {
   border-radius: 5px;
   color: var(--pink);
 }
-.block-view .inline-img {
+.block-text .inline-img {
   max-width: 100%;
   border-radius: var(--r-xs);
   vertical-align: middle;
@@ -2900,11 +2846,11 @@ input[type="radio"][readonly] {
   border-radius: var(--r);
   cursor: zoom-in;
 }
-.block-view .inline-img[data-src] {
+.block-text .inline-img[data-src] {
   cursor: zoom-in;
 }
 /* Inline image whose file wasn't found: a small dashed box with its alt text. */
-.block-view .inline-img-missing {
+.block-text .inline-img-missing {
   display: inline-block;
   min-width: 24px;
   min-height: 18px;
@@ -3080,7 +3026,7 @@ input[type="radio"][readonly] {
 }
 
 /* ─── Callout block ─── */
-.callout-block {
+.block-body-callout {
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -3119,11 +3065,6 @@ input[type="radio"][readonly] {
   margin-top: 1px;
   text-transform: lowercase;
   line-height: 1;
-}
-.callout-text {
-  flex: 1;
-  min-width: 0;
-  padding-top: 3px;
 }
 
 /* ─── Divider block ─── */
@@ -3437,39 +3378,238 @@ input[type="radio"][readonly] {
   font-weight: bold;
 }
 
-.block-bullet,
-.block-numbered {
-  padding-inline-start: 22px;
+/* ─── Block editor: rows, markers and inline text ─── */
+.block-editor {
+  outline: none;
 }
-.block-editor-content:has(.block-bullet)::before,
-.block-editor-content:has(.block-numbered)::before {
-  position: absolute;
-  inset-inline-start: 6px;
-  /* Centred on the first line, like the side buttons. */
-  top: calc(var(--line-top, 4px) + var(--line-h, 26px) / 2);
-  transform: translateY(-50%);
+.block-editor-row {
+  gap: 4px;
+  margin: 1px 0;
+}
+.block-editor-row[data-type="heading1"] {
+  margin-top: 1.5em;
+}
+.block-editor-row[data-type="heading2"] {
+  margin-top: 1.1em;
+}
+.block-editor-row[data-type="heading3"] {
+  margin-top: 0.8em;
+}
+.block-editor-row:first-child {
+  margin-top: 0;
+}
+.block-editor-row[data-type="code"],
+.block-editor-row[data-type="table"],
+.block-editor-row[data-type="image"],
+.block-editor-row[data-type="callout"] {
+  margin-block: 6px;
+}
+/* Two buttons on the page's start side: add a block, then the drag handle. */
+.block-editor-controls {
+  width: 44px;
+  gap: 2px;
+  justify-content: flex-end;
+}
+.block-editor-add,
+.block-editor-handle {
+  width: 20px;
+  height: 24px;
+  padding: 0;
+}
+.block-editor-add {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+.block-editor-add:hover {
+  background: var(--surface-2);
   color: var(--accent);
-  font-size: 13px;
-  line-height: 1;
 }
-.block-editor-content:has(.block-bullet)::before {
-  content: "•";
+.block-drop-indicator {
+  inset-inline: 48px 0;
 }
-.block-editor-content:has(.block-numbered)::before {
-  content: "1.";
-  font-size: 11px;
+/* The content box carries the block's own direction, so nesting, markers and the quote
+   bar sit on the right for Arabic and on the left for English, whatever the app language. */
+.block-editor-content {
+  padding-block: 3px;
+  /* A little air on both sides, so hover / selection backgrounds don't hug the text. */
+  padding-inline: calc(var(--indent, 0) * 26px + 8px) 8px;
+  border-radius: var(--r-xs);
 }
-.block-editor-type {
-  position: absolute;
-  inset-inline-end: 8px;
-  top: -13px;
-  display: none;
-  font-size: 10px;
+.block-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+.block-text {
+  flex: 1;
+  min-width: 0;
+  outline: none;
+  cursor: text;
+  text-align: start;
+  caret-color: var(--accent);
+}
+.block-text[data-empty]::before {
+  content: attr(data-placeholder);
   color: var(--text-faint);
   pointer-events: none;
 }
-.block-editor-row:focus-within .block-editor-type {
-  display: block;
+/* An empty paragraph only prompts while the caret is in it (or it is the whole post). */
+.block-paragraph[data-empty]:not(:focus):not(.placeholder-always)::before {
+  content: none;
+}
+.block-marker {
+  flex-shrink: 0;
+  width: 22px;
+  height: var(--line-h, 26px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25em;
+  line-height: 1;
+  color: var(--text);
+  user-select: none;
+}
+.block-marker-number {
+  width: auto;
+  min-width: 22px;
+  justify-content: flex-end;
+  padding-inline-end: 2px;
+  font-size: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.block-todo-box {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-block: calc((var(--line-h, 26px) - 16px) / 2);
+  margin-inline: 3px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--text-faint);
+  border-radius: 4px;
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease;
+}
+.block-todo-box:hover {
+  border-color: var(--accent);
+}
+.block-todo-box:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+.block-body-todo.checked .block-todo-box {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.block-body-todo.checked .block-text {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+.block-body-quote {
+  margin-block: 2px;
+  padding-inline-start: 14px;
+  border-inline-start: 3px solid color-mix(in srgb, var(--text) 80%, transparent);
+}
+.block-body-callout .callout-emoji-btn {
+  min-height: var(--line-h, 26px);
+  padding: 0;
+}
+/* Code and addresses read left-to-right even inside an Arabic sentence. */
+.block-text .inline-code {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.block-text a.inline-link {
+  cursor: text;
+  text-underline-offset: 2px;
+}
+.image-raw-input {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 12.5px;
+  outline: none;
+}
+.image-raw-input:focus {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+.code-highlight,
+.code-block-textarea {
+  font-family: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+}
+/* Whole blocks selected (Esc, Shift + arrows, or dragging across blocks). */
+.block-editor-row.selected .block-editor-content {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.block-editor.is-block-selecting,
+.block-editor.is-block-selecting * {
+  user-select: none;
+  cursor: default;
+}
+/* Slash menu at the caret. */
+.slash-menu.slash-menu-floating {
+  position: fixed;
+  inset: auto;
+  z-index: 200;
+}
+.block-context-kbd {
+  margin-inline-start: auto;
+  font-family: inherit;
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+/* Selection toolbar. */
+.format-toolbar {
+  z-index: 210;
+}
+.format-toolbar .floating-toolbar-btn {
+  font-size: 14px;
+}
+.format-toolbar .floating-toolbar-btn.active {
+  background: rgba(255, 255, 255, 0.2);
+  color: #8fe6da;
+}
+.format-toolbar-code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.format-toolbar-link {
+  width: 260px;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #fff;
+  font-size: 12.5px;
+}
+.format-toolbar-link::placeholder {
+  color: rgba(255, 255, 255, 0.5);
 }
 .slash-menu {
   position: absolute;
@@ -3568,6 +3708,20 @@ input[type="radio"][readonly] {
   color: var(--accent);
   font-size: 12px;
 }
+/* Text menu: shortcut pinned to the end, the ✓ right before it. */
+.text-context-menu {
+  width: 260px;
+}
+.text-context-menu .block-context-check + .block-context-kbd {
+  margin-inline-start: 6px;
+}
+.text-context-menu button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.text-context-menu button:disabled:hover {
+  background: transparent;
+}
 .block-context-menu button.danger strong {
   color: var(--red);
 }
@@ -3604,8 +3758,7 @@ input[type="radio"][readonly] {
   .block-editor {
     padding-inline: 1.35rem;
   }
-  .block-editor-controls,
-  .block-editor-end {
+  .block-editor-controls {
     opacity: 1;
   }
 }
@@ -3617,8 +3770,7 @@ input[type="radio"][readonly] {
   .block-editor-row {
     gap: 4px;
   }
-  .block-editor-controls,
-  .block-editor-end {
+  .block-editor-controls {
     width: 24px;
   }
 }
