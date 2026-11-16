@@ -15,7 +15,7 @@ export type EditorFont =
   | 'lora'
   | 'merriweather'
   | 'georgia';
-export type EditorFontSize = 'sm' | 'md' | 'lg';
+export type EditorFontSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'xxl';
 export type EditorLineHeight = 'compact' | 'comfortable' | 'relaxed';
 export type AutoSaveInterval = 3000 | 5000 | 10000 | 30000;
 
@@ -116,9 +116,12 @@ export function editorFontFamily(editorFont: EditorFont, arabicFont: ArabicFont)
 }
 
 export const EDITOR_FONT_SIZE: Record<EditorFontSize, string> = {
+  xs: '12px',
   sm: '13px',
   md: '15px',
   lg: '17px',
+  xl: '19px',
+  xxl: '22px',
 };
 
 export const EDITOR_LINE_HEIGHT: Record<EditorLineHeight, string> = {

@@ -101,11 +101,10 @@ export function SettingsPage() {
     { value: 'georgia',        label: 'Georgia' },
   ];
 
-  const SIZES: OptionItem<EditorFontSize>[] = [
-    { value: 'sm', label: t('settings.sizes.sm') },
-    { value: 'md', label: t('settings.sizes.md') },
-    { value: 'lg', label: t('settings.sizes.lg') },
-  ];
+  // Labels show the pixel size: six worded labels would overflow the segment row.
+  const SIZES: OptionItem<EditorFontSize>[] = (['xs', 'sm', 'md', 'lg', 'xl', 'xxl'] as const).map(
+    value => ({ value, label: EDITOR_FONT_SIZE[value].replace('px', '') }),
+  );
 
   const LINE_HEIGHTS: OptionItem<EditorLineHeight>[] = [
     { value: 'compact',     label: t('settings.lineHeights.compact') },
